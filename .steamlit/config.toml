@@ -3,9 +3,9 @@
 # Setting the port for the Streamlit server
 port = 8501
 # Limiting the maximum upload size (in megabytes)
-maxUploadSize = 200
+maxUploadSize = 1024
 # Setting the maximum allowable size for in-memory cache (in megabytes)
-maxCachedFileSize = 200
+maxCachedFileSize = 1024
 
 [client]
 # Controlling the maximum message size that the frontend can receive (in bytes)
