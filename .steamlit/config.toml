@@ -1,2 +1,21 @@
+# ~/.streamlit/config.toml
 [server]
-maxUploadSize = 1000
+# Setting the port for the Streamlit server
+port = 8501
+# Limiting the maximum upload size (in megabytes)
+maxUploadSize = 200
+# Setting the maximum allowable size for in-memory cache (in megabytes)
+maxCachedFileSize = 200
+
+[client]
+# Controlling the maximum message size that the frontend can receive (in bytes)
+maxMessageSize = 10485760
+
+[theme]
+# Enabling dark mode theme
+base = "dark"
+primaryColor = "#1E88E5"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#262730"
+textColor = "#FAFAFA"
+
