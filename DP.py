@@ -361,12 +361,12 @@ elif selected == "Paid Media":
                     # Set up download button
                         st.download_button(label=label, data=excel_file, file_name=filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                     # Display download button for the modified file
-                    download_xlsx_2(tv_cost_group.reset_index(), label=f'TV Null Cost Summary File ({file.name})', filename='TV Null GRPs Summary File.xlsx')
+                    download_xlsx_2(tv_cost_group.reset_index(), label=f'TV Null Cost Summary File ({file.name})', filename='TV Null Cost Summary File.xlsx')
                     tv_cost['tuple'] = tv_cost[col].apply(lambda x: tuple(x),axis=1)
                     # Store the modified DataFrame in the session state
                     st.session_state.modified_files[file.name] = tv_cost
                     # Display download button for the modified file with unique key
-                    download_xlsx_2(tv_cost[tv_cost['tuple'].isin(tv_cost_group.index)], label=f'TV Null Cost Raw File ({file.name})', filename='TV Null GRPs Raw File.xlsx')
+                    download_xlsx_2(tv_cost[tv_cost['tuple'].isin(tv_cost_group.index)], label=f'TV Null Cost Raw File ({file.name})', filename='TV Null Cost Raw File.xlsx')
                             # Create an in-memory bytes buffer to hold the Excel file content
                     output = io.BytesIO()
                     
