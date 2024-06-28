@@ -274,12 +274,12 @@ elif selected == "Paid Media":
                     # Set up download button
                         st.download_button(label=label, data=excel_file, file_name=filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                     # Display download button for the modified file
-                    download_xlsx_2(digtal_cost_group.reset_index(), label=f'Digtal Cost Null Summary File ({file.name})', filename=f'Digtal Cost Null Summary File ({file.name})')
+                    download_xlsx_2(digtal_cost_group.reset_index(), label=f'Digtal Cost Null Summary File ({file.name})', filename='Digtal Cost Null Summary File.xlsx')
                     digtal_cost['tuple'] = digtal_cost[col].apply(lambda x: tuple(x),axis=1)
                     # Store the modified DataFrame in the session state
                     st.session_state.modified_files[file.name] = digtal_cost
                     # Display download button for the modified file with unique key
-                    download_xlsx_2(digtal_cost[digtal_cost['tuple'].isin(digtal_cost_group.index)], label=f'Digtal Cost Null Raw File ({file.name})', filename=f'Digtal Cost Null Summary File ({file.name})')
+                    download_xlsx_2(digtal_cost[digtal_cost['tuple'].isin(digtal_cost_group.index)], label=f'Digtal Cost Null Raw File ({file.name})', filename='Digtal Cost Null Summary File.xlsx')
 
                     #2. Null Impressions - Digital,Commerce & Search
 
@@ -303,12 +303,12 @@ elif selected == "Paid Media":
                     # Set up download button
                         st.download_button(label=label, data=excel_file, file_name=filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                     # Display download button for the modified file
-                    download_xlsx_2(digtal_imp_group.reset_index(), label=f'Digtal Imp Null Summary File ({file.name})', filename=f'Digtal Imp Null Summary File ({file.name})')
+                    download_xlsx_2(digtal_imp_group.reset_index(), label=f'Digtal Imp Null Summary File ({file.name})', filename='Digtal Imp Null Summary File.xlsx')
                     digtal_imp['tuple'] = digtal_imp[col].apply(lambda x: tuple(x),axis=1)
                     # Store the modified DataFrame in the session state
                     st.session_state.modified_files[file.name] = digtal_imp
                     # Display download button for the modified file with unique key
-                    download_xlsx_2(digtal_imp[digtal_imp['tuple'].isin(digtal_imp_group.index)], label=f'Digtal Imp Null Raw File ({file.name})', filename=f'Digtal Imp Null Summary File ({file.name})')
+                    download_xlsx_2(digtal_imp[digtal_imp['tuple'].isin(digtal_imp_group.index)], label=f'Digtal Imp Null Raw File ({file.name})', filename='Digtal Imp Null Summary File.xlsx')
                     
                     #3. Null GRPs - TV
                     
@@ -332,12 +332,12 @@ elif selected == "Paid Media":
                     # Set up download button
                         st.download_button(label=label, data=excel_file, file_name=filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                     # Display download button for the modified file
-                    download_xlsx_2(tv_grp_group.reset_index(), label=f'TV Null GRPs Summary File ({file.name})', filename=f'TV Null GRPs Summary File ({file.name})')
+                    download_xlsx_2(tv_grp_group.reset_index(), label=f'TV Null GRPs Summary File ({file.name})', filename='TV Null GRPs Summary File.xlsx')
                     tv_grp['tuple'] = tv_grp[col].apply(lambda x: tuple(x),axis=1)
                     # Store the modified DataFrame in the session state
                     st.session_state.modified_files[file.name] = tv_grp
                     # Display download button for the modified file with unique key
-                    download_xlsx_2(tv_grp[tv_grp['tuple'].isin(tv_grp_group.index)], label=f'TV Null GRPs Raw File ({file.name})', filename=f'TV Null GRPs Summary File ({file.name})')
+                    download_xlsx_2(tv_grp[tv_grp['tuple'].isin(tv_grp_group.index)], label=f'TV Null GRPs Raw File ({file.name})', filename='TV Null GRPs Summary File.xlsx')
                     
                     #4. Null Media_Cost - TV
 
@@ -361,12 +361,12 @@ elif selected == "Paid Media":
                     # Set up download button
                         st.download_button(label=label, data=excel_file, file_name=filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                     # Display download button for the modified file
-                    download_xlsx_2(tv_cost_group.reset_index(), label=f'TV Null Cost Summary File ({file.name})', filename=f'TV Null GRPs Summary File ({file.name})')
+                    download_xlsx_2(tv_cost_group.reset_index(), label=f'TV Null Cost Summary File ({file.name})', filename='TV Null GRPs Summary File.xlsx')
                     tv_cost['tuple'] = tv_cost[col].apply(lambda x: tuple(x),axis=1)
                     # Store the modified DataFrame in the session state
                     st.session_state.modified_files[file.name] = tv_cost
                     # Display download button for the modified file with unique key
-                    download_xlsx_2(tv_cost[tv_cost['tuple'].isin(tv_cost_group.index)], label=f'TV Null Cost Raw File ({file.name})', filename=f'TV Null GRPs Summary File ({file.name})')
+                    download_xlsx_2(tv_cost[tv_cost['tuple'].isin(tv_cost_group.index)], label=f'TV Null Cost Raw File ({file.name})', filename='TV Null GRPs Summary File.xlsx')
                             # Create an in-memory bytes buffer to hold the Excel file content
                     output = io.BytesIO()
                     
