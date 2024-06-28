@@ -279,7 +279,7 @@ elif selected == "Paid Media":
                     # Store the modified DataFrame in the session state
                     st.session_state.modified_files[file.name] = digtal_cost
                     # Display download button for the modified file with unique key
-                    download_xlsx_2(digtal_cost[digtal_cost['tuple'].isin(digtal_cost_group.index)], label=f'Digtal Cost Null Raw File ({file.name})', filename='Digtal Cost Null Summary File.xlsx')
+                    download_xlsx_2(digtal_cost[digtal_cost['tuple'].isin(digtal_cost_group.index)], label=f'Digtal Cost Null Raw File ({file.name})', filename='Digtal Cost Null Raw File.xlsx')
 
                     #2. Null Impressions - Digital,Commerce & Search
 
@@ -308,7 +308,7 @@ elif selected == "Paid Media":
                     # Store the modified DataFrame in the session state
                     st.session_state.modified_files[file.name] = digtal_imp
                     # Display download button for the modified file with unique key
-                    download_xlsx_2(digtal_imp[digtal_imp['tuple'].isin(digtal_imp_group.index)], label=f'Digtal Imp Null Raw File ({file.name})', filename='Digtal Imp Null Summary File.xlsx')
+                    download_xlsx_2(digtal_imp[digtal_imp['tuple'].isin(digtal_imp_group.index)], label=f'Digtal Imp Null Raw File ({file.name})', filename='Digtal Imp Null Raw File.xlsx')
                     
                     #3. Null GRPs - TV
                     
@@ -337,7 +337,7 @@ elif selected == "Paid Media":
                     # Store the modified DataFrame in the session state
                     st.session_state.modified_files[file.name] = tv_grp
                     # Display download button for the modified file with unique key
-                    download_xlsx_2(tv_grp[tv_grp['tuple'].isin(tv_grp_group.index)], label=f'TV Null GRPs Raw File ({file.name})', filename='TV Null GRPs Summary File.xlsx')
+                    download_xlsx_2(tv_grp[tv_grp['tuple'].isin(tv_grp_group.index)], label=f'TV Null GRPs Raw File ({file.name})', filename='TV Null GRPs Raw File.xlsx')
                     
                     #4. Null Media_Cost - TV
 
@@ -366,7 +366,7 @@ elif selected == "Paid Media":
                     # Store the modified DataFrame in the session state
                     st.session_state.modified_files[file.name] = tv_cost
                     # Display download button for the modified file with unique key
-                    download_xlsx_2(tv_cost[tv_cost['tuple'].isin(tv_cost_group.index)], label=f'TV Null Cost Raw File ({file.name})', filename='TV Null GRPs Summary File.xlsx')
+                    download_xlsx_2(tv_cost[tv_cost['tuple'].isin(tv_cost_group.index)], label=f'TV Null Cost Raw File ({file.name})', filename='TV Null GRPs Raw File.xlsx')
                             # Create an in-memory bytes buffer to hold the Excel file content
                     output = io.BytesIO()
                     
