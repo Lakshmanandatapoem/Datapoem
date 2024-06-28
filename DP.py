@@ -57,18 +57,19 @@ def login(username, password):
 st.divider()
 # Display content based on the selected option
 if selected == "Home":
-    if selected == "Home":
-        # Add login form
-        st.subheader("Login")
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
+    st.write("Home")
+    #if selected == "Home":
+        # # Add login form
+        # st.subheader("Login")
+        # username = st.text_input("Username")
+        # password = st.text_input("Password", type="password")
         
-        if st.button("Login"):
-            if login(username, password):
-                st.success("Login successful!")
-                # Place additional code here for what happens after successful login
-            else:
-                st.error("Login failed. Please check your username and password.")    
+        # if st.button("Login"):
+        #     if login(username, password):
+        #         st.success("Login successful!")
+        #         # Place additional code here for what happens after successful login
+        #     else:
+        #         st.error("Login failed. Please check your username and password.")    
 elif selected == "Paid Media":
         # Function to initialize session state
     def initialize_session_state():
@@ -165,21 +166,21 @@ elif selected == "Paid Media":
             # 12. Scale
             Scale = df[df['Brand'] == 'Scale']
             filtered_data['Scale'] = Scale
-
-            # Display filtered data and provide download buttons
             for key, data in filtered_data.items():
-                st.write(f"{key} Data:")
-                
-                # Download button for each subset
+                st.write(f"{key} Data:")   
                 if not data.empty:
-                    download_link = st.download_button(
-                        label=f"Download {key} Data as CSV",
-                        data=data.to_csv().encode('utf-8'),
-                        file_name=f"{key.replace(' ', '_')}_Raw_Data.csv",  # Replace spaces in key with underscores
-                        mime='text/csv'
-                    )
-                    # if download_link is not None:
-                    #     st.markdown(download_link, unsafe_allow_html=True)
+                                towrite = io.BytesIO()
+                                data.to_excel(towrite, index=False, header=True)
+                                towrite.seek(0)
+                                
+                                st.download_button(
+                                    label=f"Download {key} Raw Data as xlsx",
+                                    data=towrite,
+                                    file_name=f"{key.replace(' ', '_')}_Raw_Data.xlsx",
+                                    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                                )
+                                            # if download_link is not None:
+                                            # st.markdown(download_link, unsafe_allow_html=True)
 
     if selected == 'Data Cleaning':
         st.subheader("Data Cleaning Process")
@@ -219,8 +220,13 @@ elif selected == "Paid Media":
                         filename = filename.replace('Raw', 'Processed')
                     excel_file = io.BytesIO()
                     df.to_excel(excel_file, index=False)
-                    excel_file.seek(0)
-                    st.download_button(label=label, data=excel_file, file_name=filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    excel_file.seek(0)  
+                    st.download_button(label=label, 
+                                       data=excel_file, 
+                                       file_name=filename, 
+                                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                       key=f"download_button_{filename}_{label}"
+                                       )
                 # Display download button for the modified file
                 download_xlsx(df, label=f'Download Modified File ({file.name})', filename=file.name)
                 
