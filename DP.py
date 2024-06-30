@@ -868,15 +868,16 @@ elif selected == "Nielsen":
         data = data[data["BRAND"].isin(BRAND)]
         st.sidebar.header("Filter by Category")
         CATEGORY = st.sidebar.multiselect("Select the CATEGORY:", options=data["MARS_CATEGORY"].unique())
-        data = data[data["CATEGORY"].isin(CATEGORY)]
+        data = data[data["MARS_CATEGORY"].isin(CATEGORY)]
         st.sidebar.header("Filter by SUB Category")
         SUB_CATEGORY = st.sidebar.multiselect("Select the SUB CATEGORY:", options=data["MARS_SUB-CATEGORY"].unique())
-        data = data[data["SUB CATEGORY"].isin(SUB_CATEGORY)]
+        data = data[data["MARS_SUB-CATEGORY"].isin(SUB_CATEGORY)]
         return data
     def generate_Mars_pivot_table(filtered_data):
         pivot_table = filtered_data.pivot_table(index=['BRAND','MARS_CATEGORY','MARS_SUB-CATEGORY'], values='$', aggfunc='sum')
         pivot_table.reset_index(inplace=True) 
         return pivot_table
+    
     def main():
         st.subheader('Nielsen')
         # Set title and description
