@@ -9,6 +9,7 @@ import subprocess
 import sys 
 import json
 from io import BytesIO
+import matplotlib.pyplot as plt
 
 st.set_page_config(
     page_title="Datapoem.Datateam",
@@ -776,11 +777,11 @@ elif selected == "Competition":
     st.subheader("Kantar")
     st.subheader("Pathmatics")
 elif selected == "Nielsen":
+    
         # Function to read text file and convert to DataFrame
     def convert_to_dataframe(uploaded_file):
         # Read the text file with '|' delimiter
         df = pd.read_csv(uploaded_file, delimiter='|', dtype={'UPC': 'object'})
-        
         # Check if 'Period Description' column exists
         if 'Period Description' in df.columns:
             # Extract dates from 'Period Description' if the file name contains "prd"
@@ -806,6 +807,7 @@ elif selected == "Nielsen":
         # Set up the StringIO object for downloading
         csv_data = output.getvalue().encode('utf-8')
         st.download_button(label=label, data=csv_data, file_name=filename, mime="text/csv")
+
     def download_csv_BnW(df, label, filename='BnW_Filtered_Raw_Data.csv'):
         # Create a StringIO object to store the CSV file
         output = io.StringIO()
@@ -814,6 +816,7 @@ elif selected == "Nielsen":
         # Set up the StringIO object for downloading
         csv_data = output.getvalue().encode('utf-8')
         st.download_button(label=label, data=csv_data, file_name=filename, mime="text/csv")
+
     def download_csv_NIC(df, label, filename='NIC_Filtered_Raw_Data.csv'):
         # Create a StringIO object to store the CSV file
         output = io.StringIO()
@@ -821,7 +824,24 @@ elif selected == "Nielsen":
         df.to_csv(output, index=False)
         # Set up the StringIO object for downloading
         csv_data = output.getvalue().encode('utf-8')
-        st.download_button(label=label, data=csv_data, file_name=filename, mime="text/csv")       
+        st.download_button(label=label, data=csv_data, file_name=filename, mime="text/csv")
+    def download_csv_NIC_Competition(df, label, filename='PC_Filtered_Raw_Data.csv'):
+        # Create a StringIO object to store the CSV file
+        output = io.StringIO()
+        # Write the DataFrame to the StringIO object
+        df.to_csv(output, index=False)
+        # Set up the StringIO object for downloading
+        csv_data = output.getvalue().encode('utf-8')
+        st.download_button(label=label, data=csv_data, file_name=filename, mime="text/csv") 
+
+    def download_csv_Mars(df, label, filename='Mars_Brands_Data.csv'):
+        # Create a StringIO object to store the CSV file
+        output = io.StringIO()
+        # Write the DataFrame to the StringIO object
+        df.to_csv(output, index=False)
+        # Set up the StringIO object for downloading
+        csv_data = output.getvalue().encode('utf-8')
+        st.download_button(label=label, data=csv_data, file_name=filename, mime="text/csv")     
 
     # Sidebar function for filtering data
     def sidebar_filters(data):
@@ -849,14 +869,154 @@ elif selected == "Nielsen":
         pivot_table = filtered_data.pivot_table(index=['Market Description', 'BRAND','CATEGORY','SUB CATEGORY'], values='$', aggfunc='sum')
         pivot_table.reset_index(inplace=True)  # Reset index to include index columns in the DataFrame
         return pivot_table
+    
+    def main():
+        st.subheader('Nielsen')
+        # Set title and description
+        st.subheader('')
+        # Upload text files
+        uploaded_files = st.file_uploader("Choose Mars Text files", type=['txt'], accept_multiple_files=True)
+        uploaded_file_names = set()  # Set to store uploaded file names
+        dfs = []  # List to store DataFrames
+        file_rows = {} 
+        if uploaded_files:
+            for uploaded_file in uploaded_files:
+                # Check if the file is already uploaded
+                if uploaded_file.name not in uploaded_file_names:
+                    uploaded_file_names.add(uploaded_file.name)  # Add the file name to the set
+                    # Read and convert each text file
+                    df = convert_to_dataframe(uploaded_file)
+                    dfs.append(df)  # Append the DataFrame to the list
+                    file_rows[uploaded_file.name] = df.shape[0]  # Store the number of rows
+                    file_name = uploaded_file.name  # Get the name of the uploaded file
+                    # Display the file name and DataFrame
+                    st.write(f"File Name: {file_name}")
+                    st.write(df)
+                else:
+                    st.warning(f"File '{uploaded_file.name}' is already uploaded and cannot be browsed again.")
+          # Merge DataFrames if multiple files are uploaded
+        if len(dfs) > 0:
+            Nielsen_Raw_Data = dfs[0]  # Initialize Nielsen_Raw_Data with the first DataFrame
+            for df in dfs[1:]:
+                # Adjust keys accordingly
+                if 'Period Key' in df.columns:
+                    Nielsen_Raw_Data = Nielsen_Raw_Data.merge(df, on=['Period Key'], how='left')
+                if 'Market Key' in df.columns:
+                    Nielsen_Raw_Data = Nielsen_Raw_Data.merge(df, on=['Market Key'], how='left')
+                if 'PRODUCT KEY' in df.columns:
+                    Nielsen_Raw_Data = Nielsen_Raw_Data.merge(df, on=['PRODUCT KEY'], how='left')
+            Nielsen_Raw_Data['DP_Date'] = pd.to_datetime(Nielsen_Raw_Data['Period Description'].str.extract(r'(\d{2}/\d{2}/\d{2})')[0], format='%m/%d/%y')
+            Nielsen_Raw_Data['DP_Day'] = Nielsen_Raw_Data['DP_Date'].dt.day    
+            Nielsen_Raw_Data['DP_Month'] = Nielsen_Raw_Data['DP_Date'].dt.month
+            Nielsen_Raw_Data['DP_Year'] = Nielsen_Raw_Data['DP_Date'].dt.year
+            Nielsen_Raw_Data['UPC'] = Nielsen_Raw_Data['UPC'].apply(lambda x: str(x).zfill(12))
+            # Drop the 'Period Description' column
+            # Nielsen_Raw_Data.drop(columns=['Period Description','Market Key','PRODUCT KEY','Period Key'], inplace=True)
+            desired_order = [
+                "DP_Date",
+                "DP_Day", 
+                "DP_Month",
+                "DP_Year",
+                "Market Key",
+                "Market Description",
+                "PRODUCT KEY",
+                "MARS_CATEGORY",
+                "MARS_SUB-CATEGORY",
+                "UPC",
+                "BASE SIZE",
+                "BRAND",
+                "BRAND FAMILY",
+                "BRAND HIGH",
+                "BRAND OWNER",
+                "ITEM",
+                "Period Key",
+                "Period Description",
+                "$",
+                "Units",
+                "Avg Unit Price",
+                "Any Promo Unit Price",
+                "No Promo Unit Price",
+                "TDP",
+                "%ACV",
+                "Any Promo $",
+                "No Promo $",
+                "Feat & Disp $",
+                "Any Disp $",
+                "Any Feat $"
+            ]
+            Nielsen_Raw_Data = Nielsen_Raw_Data[desired_order]
+            merged_rows = Nielsen_Raw_Data.shape[0]  
+            st.write("Nielsen Raw Data:")
+            st.write(Nielsen_Raw_Data)
+            st.write(f"Number of rows in Nielsen_Raw_Data: {merged_rows}")
+            st.write("Number of rows in each uploaded file:")
+            for file_name, num_rows in file_rows.items():
+                st.write(f"{file_name}: {num_rows}")
+            download_csv_raw(Nielsen_Raw_Data, label="Download Mars_Raw_Data (csv)",filename="Mars_Raw_Data.csv")
 
+            #Mars Brand:
+                    
+            Mars = Nielsen_Raw_Data[Nielsen_Raw_Data['BRAND OWNER'].isin(['MARS INCORPORATED'])]
+            Mars_1 = Mars[Mars['BRAND HIGH'].str.contains('M&M', na=False)]
+            Mars_1 = Mars_1.assign(
+                DP_Organisation='Mars',
+                DP_Business_Unit='FMCG',
+                DP_Category='CONFECTIONERY',
+                DP_Sub_category='CONFECTIONERY',
+                DP_Brand='',
+                DP_Total_Brand='',
+                DP_Brand_Type = 'Brand')
+            Mars_Brand_Data = pd.concat([Mars_1])   
+            download_csv_Mars(Mars_Brand_Data, label="Download Mars_Brands_Data (csv)",filename="Mars_Brand_Data.csv")
+            
+            #Mars Competition:
+                    
+            Mars_Snickers_Competition = Nielsen_Raw_Data[Nielsen_Raw_Data['BRAND OWNER'].isin(['MARS INCORPORATED'])]
+            Mars_Snickers_Competition_1 = Mars_Snickers_Competition[Mars_Snickers_Competition['BRAND'].str.contains('SNICKERS', na=False)]
+            Mars_Snickers_Competition_1 = Mars_Snickers_Competition_1.assign(
+                DP_Organisation=Mars_Snickers_Competition_1['BRAND OWNER'],
+                DP_Business_Unit='FMCG',
+                DP_Category='CONFECTIONERY',
+                DP_Sub_category='CONFECTIONERY',
+                DP_Brand='Snickers',
+                DP_Total_Brand='Snickers',
+                DP_Brand_Type = 'Competition',
+                Competition_of = "Mars M&M"
+                )
+            Mars_Reese_Competition = Nielsen_Raw_Data[Nielsen_Raw_Data['BRAND OWNER'].isin(["HERSHEY CHOCOLATE, USA"])]
+            Mars_Reese_Competition_1 = Mars_Reese_Competition[Mars_Reese_Competition['BRAND'].str.contains("REESE'S", na=False)]
+            Mars_Reese_Competition_1 = Mars_Reese_Competition_1.assign(
+                DP_Organisation=Mars_Reese_Competition_1['BRAND OWNER'],
+                DP_Business_Unit='FMCG',
+                DP_Category='CONFECTIONERY',
+                DP_Sub_category='CONFECTIONERY',
+                DP_Brand="Reese'S",
+                DP_Total_Brand="Reese'S",
+                DP_Brand_Type = 'Competition',
+                Competition_of = "Mars M&M"
+                )
+            Mars_kinder_Competition = Nielsen_Raw_Data[Nielsen_Raw_Data['BRAND OWNER'].isin(["FERRERO U S A INC"])]
+            Mars_kinder_Competition_1 = Mars_kinder_Competition[Mars_kinder_Competition['BRAND'].str.contains("KINDER", na=False)]
+            Mars_kinder_Competition_1 = Mars_kinder_Competition_1.assign(
+                DP_Organisation=Mars_kinder_Competition_1['BRAND OWNER'],
+                DP_Business_Unit='FMCG',
+                DP_Category='CONFECTIONERY',
+                DP_Sub_category='CONFECTIONERY',
+                DP_Brand='Kinder',
+                DP_Total_Brand='Kinder',
+                DP_Brand_Type = 'Competition',
+                Competition_of = "Mars M&M"
+                )
+            Mars_Competition_Data = pd.concat([Mars_Reese_Competition_1,Mars_kinder_Competition_1,Mars_Snickers_Competition_1])   
+            download_csv_Mars(Mars_Competition_Data, label="Download Mars_Competition_Data (csv)",filename="Mars_Competition_Data.csv")
+                   
+    if __name__ == "__main__":            
+        main()           
 
     # Main function to run the Streamlit web application
     def main():
-        # Set title and description
-        st.subheader('Nielsen')
         # Upload text files
-        uploaded_files = st.file_uploader("Choose Text files", type=['txt'], accept_multiple_files=True)
+        uploaded_files = st.file_uploader("Choose Unilevel Text files", type=['txt'], accept_multiple_files=True)
 
         uploaded_file_names = set()  # Set to store uploaded file names
         dfs = []  # List to store DataFrames
@@ -889,25 +1049,67 @@ elif selected == "Nielsen":
                     Nielsen_Raw_Data = Nielsen_Raw_Data.merge(df, on=['Market Key'], how='left')
                 if 'PRODUCT KEY' in df.columns:
                     Nielsen_Raw_Data = Nielsen_Raw_Data.merge(df, on=['PRODUCT KEY'], how='left')
-
+            Nielsen_Raw_Data['DP_Date'] = pd.to_datetime(Nielsen_Raw_Data['Period Description'].str.extract(r'(\d{2}/\d{2}/\d{2})')[0], format='%m/%d/%y')
+            Nielsen_Raw_Data['DP_Day'] = Nielsen_Raw_Data['DP_Date'].dt.day    
+            Nielsen_Raw_Data['DP_Month'] = Nielsen_Raw_Data['DP_Date'].dt.month
+            Nielsen_Raw_Data['DP_Year'] = Nielsen_Raw_Data['DP_Date'].dt.year
+            Nielsen_Raw_Data['UPC'] = Nielsen_Raw_Data['UPC'].apply(lambda x: str(x).zfill(12))
             # Drop the 'Period Description' column
             # Nielsen_Raw_Data.drop(columns=['Period Description','Market Key','PRODUCT KEY','Period Key'], inplace=True)
-
-            # Count rows for Nielsen_Raw_Data
+            desired_order = [
+                "DP_Date",
+                "DP_Day", 
+                "DP_Month",
+                "DP_Year",
+                "Market Key",
+                "Market Description",
+                "PRODUCT KEY",
+                "CATEGORY",
+                "SUB CATEGORY",
+                "UPC",
+                "BASE SIZE",
+                "BRAND",
+                "BRAND FAMILY",
+                "BRAND LOW",
+                "BRAND OWNER",
+                "DEPARTMENT",
+                "PRODUCT SIZE",
+                "TARGET GROUP AGE",
+                "TARGET GROUP GENDER",
+                "ITEM",
+                "Period Key",
+                "Period Description",
+                "$",
+                "Units",
+                "Avg Unit Price",
+                "Any Promo Unit Price",
+                "No Promo Unit Price",
+                "TDP",
+                "%ACV",
+                "Any Promo $",
+                "No Promo $",
+                "Feat & Disp $",
+                "Any Disp $",
+                "Any Feat $",
+                "Disp w/o Feat Unit Price",
+                "Feat w/o Disp Unit Price",
+                "Feat & Disp Unit Price",
+                "Any Disp Unit Price",
+                "Any Feat Unit Price",
+                "Disp w/o Feat $",
+                "Feat w/o Disp $",
+                "Any Promo %ACV"
+            ]
+            Nielsen_Raw_Data = Nielsen_Raw_Data[desired_order]
             merged_rows = Nielsen_Raw_Data.shape[0]
-
             st.write("Nielsen Raw Data:")
             st.write(Nielsen_Raw_Data)
             st.write(f"Number of rows in Nielsen_Raw_Data: {merged_rows}")
-
-            # Display number of rows for each file
             st.write("Number of rows in each uploaded file:")
             for file_name, num_rows in file_rows.items():
                 st.write(f"{file_name}: {num_rows}")
-
-            # Add download buttons for the Nielsen_Raw_Data
-            download_csv_raw(Nielsen_Raw_Data, label="Download Raw_Data (csv)")
-            
+            download_csv_raw(Nielsen_Raw_Data, label="Download Unilever_Raw_Data (csv)",filename="Unilever_Raw_Data.csv")
+         
             #Bar:
                     
             Bar_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['CATEGORY'].isin(['SOAP'])]
@@ -915,7 +1117,14 @@ elif selected == "Nielsen":
             Bar_3 = Bar_2[Bar_2['Market Description'].isin(['Total US xAOC'])]
             Bar_4 = Bar_3[Bar_3['BRAND'].isin(['DOVE (UNILEVER HOME & PERSONAL CARE)'])]
             Bar_5 = Bar_4[~Bar_4['BRAND FAMILY'].isin(['DOVE MEN + CARE (UNILEVER HOME & PERSONAL CARE)'])]
-
+            Bar_5 = Bar_5.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Personal Care',
+                DP_Category='Skin Cleansing',
+                DP_Sub_category='Bar',
+                DP_Brand='PC Dove Bar',
+                DP_Total_Brand='PC PW Dove')
+            
             #Bodywash
 
             Bodywash_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['CATEGORY'].isin(['BODY WASH','EXFOLIATOR/SCRUBS'])]
@@ -923,12 +1132,26 @@ elif selected == "Nielsen":
             Bodywash_3 = Bodywash_2[Bodywash_2['Market Description'].isin(['Total US xAOC'])]
             Bodywash_4 = Bodywash_3[Bodywash_3['BRAND'].isin(['DOVE (UNILEVER HOME & PERSONAL CARE)'])]
             Bodywash_5 = Bodywash_4[~Bodywash_4['BRAND FAMILY'].isin(['DOVE MEN + CARE (UNILEVER HOME & PERSONAL CARE)'])]
+            Bodywash_5 = Bodywash_5.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Personal Care',
+                DP_Category='Skin Cleansing',
+                DP_Sub_category='Bodywash',
+                DP_Brand='PC Dove BW',
+                DP_Total_Brand='PC PW Dove')
 
             #PW DMC
 
             PW_DMC_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
             PW_DMC_2 = PW_DMC_1[PW_DMC_1['BRAND FAMILY'].isin(['DOVE MEN + CARE (UNILEVER HOME & PERSONAL CARE)'])]
             PW_DMC_3 = PW_DMC_2[PW_DMC_2['CATEGORY'].isin(['BODY WASH','EXFOLIATOR/SCRUBS','SOAP'])]
+            PW_DMC_3 = PW_DMC_3.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Personal Care',
+                DP_Category='Skin Cleansing',
+                DP_Sub_category='PW DMC',
+                DP_Brand='PC DMC PW',
+                DP_Total_Brand='PC DMC PW')
 
             ########################################### Deodorant ##########################################################
 
@@ -937,6 +1160,13 @@ elif selected == "Nielsen":
             Deo_DMC_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
             Deo_DMC_2 = Deo_DMC_1[Deo_DMC_1['BRAND FAMILY'].isin(['DOVE MEN + CARE (UNILEVER HOME & PERSONAL CARE)'])]
             Deo_DMC_3 = Deo_DMC_2[Deo_DMC_2['CATEGORY'].isin(['AP & DEO','DEODORANT'])]
+            Deo_DMC_3 = Deo_DMC_3.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Personal Care',
+                DP_Category='Skin Cleansing',
+                DP_Sub_category='PW DMC',
+                DP_Brand='PC DMC Deo',
+                DP_Total_Brand='PC DMC Deo')
 
             #Deo Dove
 
@@ -944,21 +1174,41 @@ elif selected == "Nielsen":
             Deo_Dove_2 = Deo_Dove_1[Deo_Dove_1['CATEGORY'].isin(['AP & DEO','DEODORANT'])]
             Deo_Dove_3 = Deo_Dove_2[Deo_Dove_2['SUB CATEGORY'].isin(['WOMEN'])]
             Deo_Dove_4 = Deo_Dove_3[Deo_Dove_3['BRAND'].isin(['DOVE (UNILEVER HOME & PERSONAL CARE)'])]
-
+            Deo_Dove_4 = Deo_Dove_4.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Personal Care',
+                DP_Category='Deodorant',
+                DP_Sub_category='Deo Dove',
+                DP_Brand='PC Deo Dove',
+                DP_Total_Brand='PC Deo Dove')
             #Deo Axe
 
             Deo_Axe_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
             Deo_Axe_2 = Deo_Axe_1[Deo_Axe_1['CATEGORY'].isin(['AP & DEO','DEODORANT','BODY SPRAY'])]
             Deo_Axe_3 = Deo_Axe_2[Deo_Axe_2['BRAND'].isin(['AXE (UNILEVER HOME & PERSONAL CARE)'])]
+            Deo_Axe_3 = Deo_Axe_3.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Personal Care',
+                DP_Category='Deodorant',
+                DP_Sub_category='Axe',
+                DP_Brand='PC Axe Deo',
+                DP_Total_Brand='PC Axe Deo')
 
             #Deo Degree
 
             Deo_Degree_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
             Deo_Degree_2 = Deo_Degree_1[Deo_Degree_1['BRAND'].isin(['DEGREE (UNILEVER HOME & PERSONAL CARE)',"UNLIMITED BY DEGREE (UNILEVER HOME & PERSONAL CARE)"])]
             Deo_Degree_3 = Deo_Degree_2[Deo_Degree_2['CATEGORY'].isin(['AP & DEO','DEODORANT'])]
+            Deo_Degree_3 = Deo_Degree_3.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Personal Care',
+                DP_Category='Deodorant',
+                DP_Sub_category='Degree',
+                DP_Brand='',
+                DP_Total_Brand='PC Degree')
 
             PC_Filted_Data = pd.concat([Bar_5, Bodywash_5, PW_DMC_3, Deo_DMC_3, Deo_Dove_4, Deo_Axe_3, Deo_Degree_3])     
-            download_csv_pc(PC_Filted_Data, label="Download PC_Brands_Data (csv)")
+            download_csv_pc(PC_Filted_Data, label="Download PC_Brands_Data (csv)",filename="Unilever_PC_Brand_Data.csv")
 
             #Bnw Brands
             #Dove Haircare
@@ -966,77 +1216,225 @@ elif selected == "Nielsen":
             Dove_Haircare_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
             Dove_Haircare_2 = Dove_Haircare_1[Dove_Haircare_1['BRAND'].isin(['DOVE (UNILEVER HOME & PERSONAL CARE)'])]
             Dove_Haircare_3 = Dove_Haircare_2[Dove_Haircare_2['CATEGORY'].isin(['SHAMPOO','STYLING PRODUCTS','BODY','SHAMPOO AND CONDITIONER COMBO','CONDITIONER','HAIR SPRAY','REMAINING HBL'])]
+            Dove_Haircare_3 = Dove_Haircare_3.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Beauty and Wellbeing',
+                DP_Category='Haircare',
+                DP_Sub_category='Haircare',
+                DP_Brand='BnW HAIR Dove',
+                DP_Total_Brand='BnW HAIR Dove')
 
             #Nexxus
 
             Nexxus_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
             Nexxus_2 = Nexxus_1[Nexxus_1['BRAND'].isin(['NEXXUS (NEXXUS PRODUCTS COMPANY)'])]
             Nexxus_3 = Nexxus_2[Nexxus_2['CATEGORY'].isin(['SHAMPOO','STYLING PRODUCTS','SHAMPOO AND CONDITIONER COMBO','CONDITIONER','HAIR SPRAY'])]
+            Nexxus_3 = Nexxus_3.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Beauty and Wellbeing',
+                DP_Category='Haircare',
+                DP_Sub_category='Haircare',
+                DP_Brand='BnW HAIR Nexxus',
+                DP_Total_Brand='BnW HAIR Nexxus')
 
             #Sheamoisture
 
             sheamoisture_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
             sheamoisture_2 = sheamoisture_1[sheamoisture_1['BRAND'].isin(['SHEA MOISTURE (SUNDIAL BRANDS LLC)'])]
             sheamoisture_3 = sheamoisture_2[sheamoisture_2['CATEGORY'].isin(['SHAMPOO','STYLING PRODUCTS','BODY','SHAMPOO AND CONDITIONER COMBO','CONDITIONER','HAIR SPRAY'])]
+            sheamoisture_3 = sheamoisture_3.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Beauty and Wellbeing',
+                DP_Category='Haircare',
+                DP_Sub_category='Haircare',
+                DP_Brand='BnW HAIR Shea Moisture',
+                DP_Total_Brand='BnW HAIR Shea Moisture')   
 
             #Tresemme
 
             Tresemme_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
             Tresemme_2 = Tresemme_1[Tresemme_1['BRAND'].isin(['SHEA MOISTURE (SUNDIAL BRANDS LLC)'])]
             Tresemme_3 = Tresemme_2[Tresemme_2['CATEGORY'].isin(['SHAMPOO','STYLING PRODUCTS','SHAMPOO AND CONDITIONER COMBO','CONDITIONER','HAIR SPRAY'])]
+            Tresemme_3 = Tresemme_3.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Beauty and Wellbeing',
+                DP_Category='Haircare',
+                DP_Sub_category='Haircare',
+                DP_Brand='BnW HAIR Tresemme',
+                DP_Total_Brand='BnW HAIR Tresemme')   
     
             #Vaseline
             
             Vaseline = Nielsen_Raw_Data[Nielsen_Raw_Data['BRAND'].isin(['VASELINE (UNILEVER HOME & PERSONAL CARE)'])]
             Vaseline_1 = Vaseline[Vaseline['CATEGORY'].isin(['BODY','REMAINING HBL'])]
+            Vaseline_1 = Vaseline_1.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Beauty and Wellbeing',
+                DP_Category='Skincare',
+                DP_Sub_category='Skincare',
+                DP_Brand='BnW Skin Vaseline',
+                DP_Total_Brand='BnW Skin Vaseline')  
 
             BnW_Filted_Data = pd.concat([Dove_Haircare_3, Nexxus_3, sheamoisture_3, Tresemme_3, Vaseline_1])     
-            download_csv_BnW(BnW_Filted_Data, label="Download BnW_Brands_Data (csv)")
+            download_csv_BnW(BnW_Filted_Data, label="Download BnW_Brands_Data (csv)",filename="Unilever_BnW_Brand_Data.csv")
             
             #Brayers
 
-            Brayers_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
-            Brayers_2 = Brayers_1[Brayers_1['BRAND'].isin(['BREYERS (GOOD HUMOR-BREYERS ICE CREAM)'])]
-            Brayers_3 = Brayers_2[Brayers_2['CATEGORY'].isin(['ICE CREAM','FROZEN NOVELTY'])]
+            Breyers_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
+            Breyers_2 = Breyers_1[Breyers_1['BRAND'].isin(['BREYERS (GOOD HUMOR-BREYERS ICE CREAM)'])]
+            Breyers_3 = Breyers_2[Breyers_2['CATEGORY'].isin(['ICE CREAM','FROZEN NOVELTY'])]
+            Brayers_3 = Breyers_3.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Icecream',
+                DP_Category='Icecream',
+                DP_Sub_category='Icecream',
+                DP_Brand="NIC ICE Breyer's",
+                DP_Total_Brand="NIC ICE Breyer's")  
 
             #Talenti
 
             Talenti_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
             Talenti_2 = Talenti_1[Talenti_1['BRAND'].isin(['TALENTI (TALENTI GELATO)'])]
             Talenti_3 = Talenti_2[Talenti_2['CATEGORY'].isin(['ICE CREAM','FROZEN NOVELTY'])]
+            Talenti_3 = Talenti_3.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Icecream',
+                DP_Category='Icecream',
+                DP_Sub_category='Icecream',
+                DP_Brand="NIC ICE Talenti",
+                DP_Total_Brand="NIC ICE Talenti")
 
             #Klondike
 
             Klondike_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
             Klondike_2 = Klondike_1[Klondike_1['BRAND'].isin(['KLONDIKE (GOOD HUMOR-BREYERS ICE CREAM)'])]
             Klondike_3 = Klondike_2[Klondike_2['CATEGORY'].isin(['ICE CREAM','FROZEN NOVELTY'])]
+            Klondike_3 = Klondike_3.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Icecream',
+                DP_Category='Icecream',
+                DP_Sub_category='Icecream',
+                DP_Brand="NIC ICE Klondike",
+                DP_Total_Brand="NIC ICE Klondike")
             
             #Yasso
 
             Yasso_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
             Yasso_2 = Yasso_1[Yasso_1['BRAND'].isin(['YASSO (YASSO INC)'])]
             Yasso_3 = Yasso_2[Yasso_2['CATEGORY'].isin(['ICE CREAM','FROZEN NOVELTY'])]
+            Yasso_3 = Yasso_3.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Icecream',
+                DP_Category='Icecream',
+                DP_Sub_category='Icecream',
+                DP_Brand="NIC Yasso",
+                DP_Total_Brand="NIC Yasso")
 
             #Hellmanns
 
             Hellmanns_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
             Hellmanns_2 = Hellmanns_1[Hellmanns_1['BRAND'].isin(['BEST FOODS (UNILEVER BESTFOODS)',"HELLMANN'S (UNILEVER BESTFOODS)"])]
             Hellmanns_3 = Hellmanns_2[Hellmanns_2['CATEGORY'].isin(['MAYONNAISE'])]
+            Hellmanns_3 = Hellmanns_3.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Nutritions',
+                DP_Category='Nutritions',
+                DP_Sub_category='Nutritions',
+                DP_Brand="NIC Mayo Hellmanns",
+                DP_Total_Brand="NIC Mayo Hellmanns")
 
             #knorr
 
             Knorr_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
             Knorr_2 = Knorr_1[Knorr_1['BRAND'].isin(['KNORR (UNILEVER BESTFOODS)'])]
             Knorr_3 = Knorr_2[Knorr_2['CATEGORY'].isin(['BOUILLON','RICE','PASTA','SHELF STABLE MEAL KIT'])]
+            Knorr_3 = Knorr_3.assign(
+                DP_Organisation='Unilever',
+                DP_Business_Unit='Nutritions',
+                DP_Category='Nutritions',
+                DP_Sub_category='Nutritions',
+                DP_Brand="NIC SCKRAID Knorr",
+                DP_Total_Brand="NIC SCKRAID Knorr")
 
             NIC_Filted_Data = pd.concat([Brayers_3, Talenti_3, Klondike_3, Yasso_3, Hellmanns_3,Knorr_3])     
-            download_csv_NIC(NIC_Filted_Data, label="Download NIC_Brands_Data (csv)")
-            
+            download_csv_NIC(NIC_Filted_Data, label="Download NIC_Brands_Data (csv)",filename="Unilever_NIC_Brand_Data.csv")
 
-            # Checkbox to enable/disable sidebar filters
+
+            #NIC ICE Competition
+
+            Breyers_Competition = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
+            Breyers_Competition_2 = Breyers_Competition[~Breyers_Competition['BRAND'].isin(['BREYERS (GOOD HUMOR-BREYERS ICE CREAM)'])]
+            Breyers_Competition_3 = Breyers_Competition_2[Breyers_Competition_2['CATEGORY'].isin(['ICE CREAM','FROZEN NOVELTY'])]
+            Brayers_Competition_3 = Breyers_Competition_3.assign(
+                DP_Organisation= Breyers_Competition_3['BRAND OWNER'],
+                DP_Business_Unit='Icecream',
+                DP_Category='Icecream',
+                DP_Sub_category='Icecream',
+                DP_Brand_Name = Breyers_Competition_3['BRAND'],
+                DP_Brand_Type = "Competition",
+                competition_of ="NIC ICE Breyer's")  
+            Talenti_Competition = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
+            Talenti_Competition_2 = Talenti_Competition[~Talenti_Competition['BRAND'].isin(['TALENTI (TALENTI GELATO)'])]
+            Talenti_Competition_3 = Talenti_Competition_2[Talenti_Competition_2['CATEGORY'].isin(['ICE CREAM','FROZEN NOVELTY'])]
+            Talenti_Competition_3 = Talenti_Competition_3.assign(
+                DP_Organisation=Talenti_Competition_3['BRAND OWNER'],
+                DP_Business_Unit='Icecream',
+                DP_Category='Icecream',
+                DP_Sub_category='Icecream',
+                DP_Brand_Name=Talenti_Competition_3['BRAND'],
+                competition_of="NIC ICE Talenti")
+            Klondike_Competition_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
+            Klondike_Competition_2 = Klondike_Competition_1[~Klondike_Competition_1['BRAND'].isin(['KLONDIKE (GOOD HUMOR-BREYERS ICE CREAM)'])]
+            Klondike_Competition_3 = Klondike_Competition_2[Klondike_Competition_2['CATEGORY'].isin(['ICE CREAM','FROZEN NOVELTY'])]
+            Klondike_Competition_3 = Klondike_Competition_3.assign(
+                DP_Organisation=Klondike_Competition_3['BRAND OWNER'],
+                DP_Business_Unit='Icecream',
+                DP_Category='Icecream',
+                DP_Sub_category='Icecream',
+                DP_Brand_Name=Klondike_Competition_3['BRAND'],
+                competition_of="NIC ICE Klondike")
+            Yasso_Competition_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
+            Yasso_Competition_2 = Yasso_Competition_1[~Yasso_Competition_1['BRAND'].isin(['YASSO (YASSO INC)'])]
+            Yasso_Competition_3 = Yasso_Competition_2[Yasso_Competition_2['CATEGORY'].isin(['ICE CREAM','FROZEN NOVELTY'])]
+            Yasso_Competition_3 = Yasso_Competition_3.assign(
+                DP_Organisation=Yasso_Competition_3['BRAND OWNER'],
+                DP_Business_Unit='Icecream',
+                DP_Category='Icecream',
+                DP_Sub_category='Icecream',
+                DP_Brand_Name=Yasso_Competition_3['BRAND'],
+                competition_of="NIC Yasso")
+            
+            NIC_Competition_Data = pd.concat([Brayers_Competition_3,Talenti_Competition_3,Klondike_Competition_3,Yasso_Competition_3])     
+            download_csv_NIC_Competition(NIC_Competition_Data, label="Download NIC_Ice_Cream_Competition_Data (csv)",filename="Unilever_NIC_ICECREAM_Competition_Data.csv")
+            #NIC Nutritions Competition
+
+            Hellmanns_Competition_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
+            Hellmanns_Competition_2 = Hellmanns_Competition_1[~Hellmanns_Competition_1['BRAND'].isin(['BEST FOODS (UNILEVER BESTFOODS)',"HELLMANN'S (UNILEVER BESTFOODS)"])]
+            Hellmanns_Competition_3 = Hellmanns_Competition_2[Hellmanns_Competition_2['CATEGORY'].isin(['MAYONNAISE'])]
+            Hellmanns_Competition_3 = Hellmanns_Competition_3.assign(
+                DP_Organisation=Hellmanns_Competition_3['BRAND OWNER'],
+                DP_Business_Unit='Nutritions',
+                DP_Category='Nutritions',
+                DP_Sub_category='Nutritions',
+                DP_Brand_Name =Hellmanns_Competition_3['BRAND'],
+                DP_Total_Brand="NIC Mayo Hellmanns")
+            Knorr_Competition_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
+            Knorr_Competition_2 = Knorr_Competition_1[~Knorr_Competition_1['BRAND'].isin(['KNORR (UNILEVER BESTFOODS)'])]
+            Knorr_Competition_3 = Knorr_Competition_2[Knorr_Competition_2['CATEGORY'].isin(['BOUILLON','RICE','PASTA','SHELF STABLE MEAL KIT'])]
+            Knorr_Competition_3 = Knorr_Competition_3.assign(
+                DP_Organisation=Knorr_Competition_3['BRAND OWNER'],
+                DP_Business_Unit='Nutritions',
+                DP_Category='Nutritions',
+                DP_Sub_category='Nutritions',
+                DP_Brand_Name =Knorr_Competition_3['BRAND'],
+                DP_Total_Brand="NIC SCKRAID Knorr")
+
+            NIC_Competition_Data = pd.concat([Hellmanns_Competition_3,Knorr_Competition_3])     
+            download_csv_NIC_Competition(NIC_Competition_Data, label="Download NIC_Nutritions_Competition_Data (csv)",filename="Unilever_NIC_NUTRITIONS_Competition_Data.csv")
+
+           
             enable_filters = st.checkbox("Enable Sidebar Filters and Pivot Table")
 
-            # Enable sidebar filters if checkbox is checked
             if enable_filters:
                 filtered_data = sidebar_filters(Nielsen_Raw_Data)
                 st.write("Filtered Data:")
@@ -1048,11 +1446,14 @@ elif selected == "Nielsen":
                 st.write("Pivot Table:")
                 st.write(pivot_table)
                 download_csv_raw(pivot_table, label="Download Pivot_Table_Data (CSV)", filename='Pivot_Table_Data.csv')
-                
+
+
+
+
 
     if __name__ == "__main__":
         main()
-
+            
     # Add content for Nielsen here
 elif selected == "Playground":
     st.subheader(f"You have selected {selected}")
