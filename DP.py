@@ -842,34 +842,41 @@ elif selected == "Nielsen":
         # Set up the StringIO object for downloading
         csv_data = output.getvalue().encode('utf-8')
         st.download_button(label=label, data=csv_data, file_name=filename, mime="text/csv")     
-
-    # Sidebar function for filtering data
-    def sidebar_filters(data):
-        
+    
+    def sidebar_filters_Unilever(data):
         st.sidebar.header("Filter by Market Description")
         MARKET_DESCRIPTION = st.sidebar.multiselect("Select the MARKET_DESCRIPTION:", options=data["Market Description"].unique())
         data = data[data["Market Description"].isin(MARKET_DESCRIPTION)]
-
         st.sidebar.header("Filter by Brand")
         BRAND = st.sidebar.multiselect("Select the Brand:", options=data["BRAND"].unique())
         data = data[data["BRAND"].isin(BRAND)]
-
         st.sidebar.header("Filter by Category")
         CATEGORY = st.sidebar.multiselect("Select the CATEGORY:", options=data["CATEGORY"].unique())
         data = data[data["CATEGORY"].isin(CATEGORY)]
-        
         st.sidebar.header("Filter by SUB Category")
         SUB_CATEGORY = st.sidebar.multiselect("Select the SUB CATEGORY:", options=data["SUB CATEGORY"].unique())
         data = data[data["SUB CATEGORY"].isin(SUB_CATEGORY)]
-
         return data
-
-    # Function to generate pivot table from filtered data
-    def generate_pivot_table(filtered_data):
+    def generate_Unilever_pivot_table(filtered_data):
         pivot_table = filtered_data.pivot_table(index=['Market Description', 'BRAND','CATEGORY','SUB CATEGORY'], values='$', aggfunc='sum')
-        pivot_table.reset_index(inplace=True)  # Reset index to include index columns in the DataFrame
+        pivot_table.reset_index(inplace=True) 
         return pivot_table
     
+    def sidebar_filters_Mars(data):
+        st.sidebar.header("Filter by Brand")
+        BRAND = st.sidebar.multiselect("Select the Brand:", options=data["BRAND"].unique())
+        data = data[data["BRAND"].isin(BRAND)]
+        st.sidebar.header("Filter by Category")
+        CATEGORY = st.sidebar.multiselect("Select the CATEGORY:", options=data["MARS_CATEGORY"].unique())
+        data = data[data["CATEGORY"].isin(CATEGORY)]
+        st.sidebar.header("Filter by SUB Category")
+        SUB_CATEGORY = st.sidebar.multiselect("Select the SUB CATEGORY:", options=data["MARS_SUB-CATEGORY"].unique())
+        data = data[data["SUB CATEGORY"].isin(SUB_CATEGORY)]
+        return data
+    def generate_Mars_pivot_table(filtered_data):
+        pivot_table = filtered_data.pivot_table(index=['BRAND','MARS_CATEGORY','MARS_SUB-CATEGORY'], values='$', aggfunc='sum')
+        pivot_table.reset_index(inplace=True) 
+        return pivot_table
     def main():
         st.subheader('Nielsen')
         # Set title and description
@@ -1009,7 +1016,21 @@ elif selected == "Nielsen":
                 )
             Mars_Competition_Data = pd.concat([Mars_Reese_Competition_1,Mars_kinder_Competition_1,Mars_Snickers_Competition_1])   
             download_csv_Mars(Mars_Competition_Data, label="Download Mars_Competition_Data (csv)",filename="Mars_Competition_Data.csv")
-                   
+            enable_filters = st.checkbox("Enable Sidebar Filters and Pivot Table")
+
+            if enable_filters:
+                filtered_data = sidebar_filters_Mars(Nielsen_Raw_Data)
+                st.write("Filtered Data:")
+                st.write(filtered_data)
+                download_csv_raw(filtered_data, label="Download Filtered_Raw_Data (CSV)", filename='Filtered_Raw_Data.csv')
+
+                # Generate pivot table from filtered data
+                pivot_table = generate_Mars_pivot_table(filtered_data)
+                st.write("Pivot Table:")
+                st.write(pivot_table)
+                download_csv_raw(pivot_table, label="Download Pivot_Table_Data (CSV)", filename='Pivot_Table_Data.csv')
+
+          
     if __name__ == "__main__":            
         main()           
 
@@ -1436,13 +1457,13 @@ elif selected == "Nielsen":
             enable_filters = st.checkbox("Enable Sidebar Filters and Pivot Table")
 
             if enable_filters:
-                filtered_data = sidebar_filters(Nielsen_Raw_Data)
+                filtered_data = sidebar_filters_Unilever(Nielsen_Raw_Data)
                 st.write("Filtered Data:")
                 st.write(filtered_data)
                 download_csv_raw(filtered_data, label="Download Filtered_Raw_Data (CSV)", filename='Filtered_Raw_Data.csv')
 
                 # Generate pivot table from filtered data
-                pivot_table = generate_pivot_table(filtered_data)
+                pivot_table = generate_Unilever_pivot_table(filtered_data)
                 st.write("Pivot Table:")
                 st.write(pivot_table)
                 download_csv_raw(pivot_table, label="Download Pivot_Table_Data (CSV)", filename='Pivot_Table_Data.csv')
