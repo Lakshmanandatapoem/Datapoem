@@ -45,8 +45,8 @@ st.markdown(custom_css, unsafe_allow_html=True)
 with st.container():
     selected = option_menu(
         menu_title="",
-        options=["Home", "Paid Media", "Non Paid Media", "Competition","Nielsen", "Playground", "DMS", "QC", 'Setting', "More Feature"],
-        icons=["house", "file-ppt", "journals",'journal-richtext' ,"database-fill-exclamation", "graph-up-arrow", "layout-text-sidebar-reverse", "search", "gear", "filter"],  # Provide an empty string for each option if no icons are used
+        options=["Home", "Paid Media", "Non Paid Media", "Competition","Nielsen", "Playground", "QC", 'Setting', "More Feature"],
+        icons=["house", "file-ppt", "journals",'journal-richtext' ,"database-fill-exclamation", "graph-up-arrow", "search", "gear", "filter"],  # Provide an empty string for each option if no icons are used
         menu_icon="cast",
         default_index=0,  # Corrected to an integer
         orientation="horizontal",
@@ -1616,17 +1616,6 @@ elif selected == "Playground":
                 st.write("AI RROI Pivot Table:")
                 st.write(pivot_table)    
         # Add content for Playground here
-elif selected == "DMS":
-    st.subheader("Development Management System")
-    uploaded_file = st.file_uploader("Choose a AI RROI Model Result File", type=['xlsx'])
-
-    if uploaded_file is not None:
-        # Process the uploaded file, e.g., read as pandas dataframe
-        # Example: Read as pandas dataframe
-        df = pd.read_excel(uploaded_file)
-        # Display some information More More Feature More Feature the uploaded file
-        st.write("### Uploaded the AI RROI Model Result File:")
-        st.write(df)
 
        
 elif selected == "QC":
