@@ -12,7 +12,7 @@ import json
 from io import BytesIO
 import matplotlib.pyplot as plt
 from io import StringIO
-
+import numpy as np
 st.set_page_config(
     page_title="Datapoem.Datateam",
     page_icon="https://green.datapoem.ai/img/datapoem-logo-white.d3e98fcd.svg",
@@ -1710,19 +1710,35 @@ elif selected == "QC":
 
     if selected == 'Preprocessed QC':
         st.header("Preprocessed QC")
-        uploaded_files = st.file_uploader("Upload CSV files", type="csv", accept_multiple_files=True)
-        
+        # Upload files
+        uploaded_files = st.file_uploader("Upload CSV or Excel files", type=["csv", "xlsx"], accept_multiple_files=True)
+
+        # Process files
         if uploaded_files:
-            dataframes = [pd.read_csv(file) for file in uploaded_files]
-            
-            # Convert 'Date' column to datetime
-            for df in dataframes:
-                df['Date'] = pd.to_datetime(df['Date'])
-            
-            # Determine common date range
-            all_dates = pd.concat([df['Date'] for df in dataframes])
-            common_start_date = all_dates.min().date()
-            common_end_date = all_dates.max().date()
+            dataframes = []
+            for file in uploaded_files:
+                if file.type == "text/csv":
+                    df = pd.read_csv(file)
+                elif file.type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+                    df = pd.read_excel(file)
+                else:
+                    continue
+                # Check if 'Date' column exists
+                if 'Date' in df.columns:
+                    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')  # Convert 'Date' to datetime, set invalid parsing to NaT
+                    dataframes.append(df)
+                else:
+                    st.warning(f"The file {file.name} does not contain a 'Date' column and will be ignored.")
+
+            if dataframes:
+                # Concatenate 'Date' columns
+                all_dates = pd.concat([df['Date'].dropna() for df in dataframes])  # Drop NaT values
+                common_start_date = all_dates.min().date()
+                common_end_date = all_dates.max().date()
+                st.write(f"Common date range: {common_start_date} to {common_end_date}")
+            else:
+                st.warning("No valid dataframes with 'Date' columns were uploaded.")
+
             
             # Date input
             start_date = st.date_input('Start date', common_start_date)
@@ -1761,25 +1777,26 @@ elif selected == "QC":
                              .str.replace(r'\|sessions\|', '|', regex=True)
                              .str.replace(r'\|spends\|', '|', regex=True))
                     all_melted_split = all_melted_df['Variable'].str.split('|', expand=True)
-                    all_melted_split.columns = ['V1', 'V2', 'V3','V4','V5','V6']   
+                    num_columns = all_melted_split.shape[1]
+                    column_names = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+                    column_names = column_names[:num_columns]
+                    all_melted_split.columns = column_names
+                    if 'V6' in all_melted_split.columns:
+                        all_melted_split['V6'] = all_melted_split['V6'].replace('', np.nan)
                     all_melted_df = pd.concat([all_melted_df, all_melted_split], axis=1)    
-                    def to_csv(df):
-                        output = StringIO()
-                        df.to_csv(output, index=False)
+                    def to_excel(df):
+                        output = BytesIO()
+                        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                            df.to_excel(writer, index=False, sheet_name='Sheet1')
                         processed_data = output.getvalue()
                         return processed_data
-
-                    # Convert the DataFrame to CSV format
-                    csv_data = to_csv(all_melted_df)
-
-                    # Create a download button for the CSV file
+                    excel_data = to_excel(all_melted_df)
                     st.download_button(
-                        label="Download CSV file",
-                        data=csv_data,
-                        file_name='all_melted_df.csv',
-                        mime='text/csv'
+                        label="Download Excel file",
+                        data=excel_data,
+                        file_name='all_melted_df.xlsx',
+                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
-
                 else:
                     st.warning("No data found for the selected date range.")
             else:
