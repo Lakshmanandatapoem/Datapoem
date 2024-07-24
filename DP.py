@@ -7,9 +7,11 @@ import os
 import sys
 import subprocess
 import sys 
+import calendar
 import json
 from io import BytesIO
 import matplotlib.pyplot as plt
+from io import StringIO
 
 st.set_page_config(
     page_title="Datapoem.Datateam",
@@ -774,8 +776,36 @@ elif selected == "Non Paid Media":
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 elif selected == "Competition":
-    st.subheader("Kantar")
     st.subheader("Pathmatics")
+    # Upload the file
+    uploaded_file = st.file_uploader("Choose a Pathmatics CSV File", type=['csv'])
+
+    if uploaded_file is not None:
+        try:
+            # Read the CSV file and skip the first row
+            df = pd.read_csv(uploaded_file, skiprows=1)
+            # Display the dataframe
+            st.write("### Uploaded the Pathmatics CSV File File:")
+            st.write(df)
+            
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+       
+        #Axe Deo Brand
+
+        Axe_Deo_Brand = df[df['Category Level 8'].isin(['Personal Care',"Men's Body Washes, Exfoliants & Scrubs","Men's Deodorants & Antiperspirants Sprays & Body Sprays"])]
+        Axe_Deo_Brand_1 = Axe_Deo_Brand[Axe_Deo_Brand['Brand Root'].isin(['Axe Products'])]
+        st.write(Axe_Deo_Brand_1)
+
+        #Axe Deo Competition
+
+        Axe_Deo_Competition = df[df['Category Level 8'].isin(['Personal Care',"Men's Body Washes, Exfoliants & Scrubs","Men's Deodorants & Antiperspirants Sprays & Body Sprays"])]
+        Axe_Deo_Competition_1 = Axe_Deo_Competition[~Axe_Deo_Competition['Brand Root'].isin(['Axe Products'])]
+        st.write(Axe_Deo_Competition_1)
+        
+    #st.subheader("Kantar")
+    
 elif selected == "Nielsen":
     
         # Function to read text file and convert to DataFrame
@@ -791,11 +821,8 @@ elif selected == "Nielsen":
 
     # Function to download DataFrame as CSV file
     def download_csv_raw(df, label, filename='Nielsen_Raw_Data.csv'):
-        # Create a StringIO object to store the CSV file
         output = io.StringIO()
-        # Write the DataFrame to the StringIO object
         df.to_csv(output, index=False)
-        # Set up the StringIO object for downloading
         csv_data = output.getvalue().encode('utf-8')
         st.download_button(label=label, data=csv_data, file_name=filename, mime="text/csv")
 
@@ -1263,7 +1290,7 @@ elif selected == "Nielsen":
 
             sheamoisture_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
             sheamoisture_2 = sheamoisture_1[sheamoisture_1['BRAND'].isin(['SHEA MOISTURE (SUNDIAL BRANDS LLC)'])]
-            sheamoisture_3 = sheamoisture_2[sheamoisture_2['CATEGORY'].isin(['SHAMPOO','STYLING PRODUCTS','BODY','SHAMPOO AND CONDITIONER COMBO','CONDITIONER','HAIR SPRAY'])]
+            sheamoisture_3 = sheamoisture_2[sheamoisture_2['CATEGORY'].isin(['SHAMPOO','STYLING PRODUCTS','BODY','SHAMPOO AND CONDITIONER COMBO','CONDITIONER','HAIR SPRAY','REMAINING HBL'])]
             sheamoisture_3 = sheamoisture_3.assign(
                 DP_Organisation='Unilever',
                 DP_Business_Unit='Beauty and Wellbeing',
@@ -1275,7 +1302,7 @@ elif selected == "Nielsen":
             #Tresemme
 
             Tresemme_1 = Nielsen_Raw_Data[Nielsen_Raw_Data['Market Description'].isin(['Total US xAOC'])]
-            Tresemme_2 = Tresemme_1[Tresemme_1['BRAND'].isin(['SHEA MOISTURE (SUNDIAL BRANDS LLC)'])]
+            Tresemme_2 = Tresemme_1[Tresemme_1['BRAND'].isin(['TRESEMME (ALBERTO CULVER COMPANY)'])]
             Tresemme_3 = Tresemme_2[Tresemme_2['CATEGORY'].isin(['SHAMPOO','STYLING PRODUCTS','SHAMPOO AND CONDITIONER COMBO','CONDITIONER','HAIR SPRAY'])]
             Tresemme_3 = Tresemme_3.assign(
                 DP_Organisation='Unilever',
@@ -1617,6 +1644,7 @@ elif selected == "Playground":
                 st.write(pivot_table)    
         # Add content for Playground here
 
+
        
 elif selected == "QC":
     # Function to process JSON file to DataFrame
@@ -1646,7 +1674,7 @@ elif selected == "QC":
 
     with st.sidebar:
         initialize_session_state()
-        selected = st.selectbox("Main Menu", ['Json to Excel'], index=0)
+        selected = st.selectbox("Main Menu", ['Json to Excel','Preprocessed QC'], index=0)
 
     st.header("Quality Check")
 
@@ -1660,7 +1688,6 @@ elif selected == "QC":
                 # Save uploaded file to a temporary location
                 with open("temp.json", "wb") as f:
                     f.write(uploaded_file.getvalue())
-                
                 # Process JSON file
                 df = process_json_to_excel("temp.json")
                 
@@ -1675,6 +1702,90 @@ elif selected == "QC":
                 # Delete temporary JSON file
                 os.remove("temp.json")
 
+
+
+
+# Your main code
+
+
+    if selected == 'Preprocessed QC':
+        st.header("Preprocessed QC")
+        uploaded_files = st.file_uploader("Upload CSV files", type="csv", accept_multiple_files=True)
+        
+        if uploaded_files:
+            dataframes = [pd.read_csv(file) for file in uploaded_files]
+            
+            # Convert 'Date' column to datetime
+            for df in dataframes:
+                df['Date'] = pd.to_datetime(df['Date'])
+            
+            # Determine common date range
+            all_dates = pd.concat([df['Date'] for df in dataframes])
+            common_start_date = all_dates.min().date()
+            common_end_date = all_dates.max().date()
+            
+            # Date input
+            start_date = st.date_input('Start date', common_start_date)
+            end_date = st.date_input('End date', common_end_date)
+            
+            if start_date and end_date:
+                filtered_dataframes = []
+                melted_dfs = []
+                for df in dataframes:
+                    mask = (df['Date'] >= pd.to_datetime(start_date)) & (df['Date'] <= pd.to_datetime(end_date))
+                    filtered_dataframes.append(df.loc[mask])
+                
+                for i, (file, filtered_df) in enumerate(zip(uploaded_files, filtered_dataframes), start=1):
+                    file_name = file.name.lower()
+                    filtered_df['Date'] = pd.to_datetime(filtered_df['Date'])
+                    melted_df = pd.melt(filtered_df, id_vars=['Date'], var_name='Variable', value_name='Value')
+                    melted_df['Year'] = melted_df['Date'].apply(lambda dt: f"{dt.year:04d}")
+                    melted_df['Month'] = melted_df['Date'].apply(lambda dt: calendar.month_abbr[dt.month])
+                    
+                    # Add additional columns based on filename
+                    if 'offline' in file_name:
+                        melted_df['Type'] = 'offline'
+                    elif 'online' in file_name:
+                        melted_df['Type'] = 'online'
+                    elif 'cost' in file_name:
+                        melted_df['Type'] = 'cost' 
+                    melted_dfs.append(melted_df)       
+
+                # Concatenate all melted dataframes
+                if melted_dfs:
+                    all_melted_df = pd.concat(melted_dfs, ignore_index=True)
+                    all_melted_df['Variable'] = (all_melted_df['Variable']
+                             .str.replace(r'\|Impressions\|', '|', regex=True)
+                             .str.replace(r'\|Cost\|', '|', regex=True)
+                             .str.replace(r'\|Media Cost\|', '|', regex=True)
+                             .str.replace(r'\|sessions\|', '|', regex=True)
+                             .str.replace(r'\|spends\|', '|', regex=True))
+                    all_melted_split = all_melted_df['Variable'].str.split('|', expand=True)
+                    all_melted_split.columns = ['V1', 'V2', 'V3','V4','V5','V6']   
+                    all_melted_df = pd.concat([all_melted_df, all_melted_split], axis=1)    
+                    def to_csv(df):
+                        output = StringIO()
+                        df.to_csv(output, index=False)
+                        processed_data = output.getvalue()
+                        return processed_data
+
+                    # Convert the DataFrame to CSV format
+                    csv_data = to_csv(all_melted_df)
+
+                    # Create a download button for the CSV file
+                    st.download_button(
+                        label="Download CSV file",
+                        data=csv_data,
+                        file_name='all_melted_df.csv',
+                        mime='text/csv'
+                    )
+
+                else:
+                    st.warning("No data found for the selected date range.")
+            else:
+                st.warning("Please select both start and end dates.")
+        else:
+            st.warning("Please upload at least one CSV file.")
 
     sys.exit()
 
