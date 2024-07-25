@@ -5,4 +5,4 @@ pandas
 matplotlib
 xlsxwriter
 uv
-streamlit config show
+
