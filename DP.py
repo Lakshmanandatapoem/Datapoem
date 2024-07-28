@@ -13,6 +13,7 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 from io import StringIO
 import numpy as np
+
 st.set_page_config(
     page_title="Datapoem.Datateam",
     page_icon="https://green.datapoem.ai/img/datapoem-logo-white.d3e98fcd.svg",
@@ -216,6 +217,16 @@ elif selected == "Paid Media":
                 # 6. Blank metrics to Zero
                 columns_to_replace = ['Impressions', 'Media_Cost', 'GRPs']
                 df[columns_to_replace] = df[columns_to_replace].fillna(0).replace('', 0)
+                #7. Metrics Check:
+                df['Metrics_Check'] = np.where(df['Impressions'] < df['Media_Cost'], "True", "False")
+                #8. Negative Metrics Check:
+                columns_to_check = ['Impressions', 'Clicks', 'Media_Cost', 'Video_Views', 'GRPs']
+                # Function to determine if any of the specified columns have negative values
+                def check_negative_values(row):
+                    negative_columns = [col for col in columns_to_check if row[col] < 0]
+                    return ', '.join(negative_columns) if negative_columns else 'No Negative Values'
+                # Create a new column with the results
+                df['Negative Check'] = df.apply(check_negative_values, axis=1)
                 # Store the modified DataFrame in the session state
                 st.session_state.modified_files[file.name] = df
                 def download_xlsx(df, label, filename):
@@ -1674,7 +1685,7 @@ elif selected == "QC":
 
     with st.sidebar:
         initialize_session_state()
-        selected = st.selectbox("Main Menu", ['Json to Excel','Preprocessed QC'], index=0)
+        selected = st.selectbox("Main Menu", ['Json to Excel','Preprocessed QC','Attribution check'], index=0)
 
     st.header("Quality Check")
 
@@ -1701,11 +1712,6 @@ elif selected == "QC":
 
                 # Delete temporary JSON file
                 os.remove("temp.json")
-
-
-
-
-# Your main code
 
 
     if selected == 'Preprocessed QC':
@@ -1803,7 +1809,8 @@ elif selected == "QC":
                 st.warning("Please select both start and end dates.")
         else:
             st.warning("Please upload at least one CSV file.")
-
+    if selected == 'Attribution Check':
+        st.header("Attribution Check")
     sys.exit()
 
     # Add content for QC here
