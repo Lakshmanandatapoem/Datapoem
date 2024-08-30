@@ -204,7 +204,7 @@ elif selected == "Paid Media":
                 # # 3. Remove empty columns
                 # df = df.dropna(axis=1, how='all')
                 # 4. Duplicate or Non-Duplicate Entry in Rows
-                columns_list = df.columns.tolist()
+                columns_list = df.columns.difference(['index']).tolist()
                 df["IsDuplicate"] = df.duplicated(subset=columns_list, keep=False)
                 df['Duplicate/Non Duplicate'] = df['IsDuplicate'].map({True: "Duplicate", False: "Non Duplicate"})
                 # 5. Convert Text format to numeric format
