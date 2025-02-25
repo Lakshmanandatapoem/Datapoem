@@ -13,6 +13,9 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 from io import StringIO
 import numpy as np
+from openpyxl import Workbook
+from io import BytesIO
+from datetime import datetime
 
 st.set_page_config(
     page_title="Datapoem.Datateam",
@@ -103,10 +106,14 @@ elif selected == "Paid Media":
             icons=['filter','link', 'file-text', 'lightning','rocket','shield'], menu_icon="cast", default_index=0)
     
     #1. Data Filtering:    
+
+
+# Check if Data Filtering is selected
     if selected == "Data Filtering":
         st.subheader("Data Filtering")
+
         # Upload CSV file
-        uploaded_file = st.file_uploader("Upload your CSV file to prepare the datapoem format:", type=["csv"], accept_multiple_files=False)
+        uploaded_file = st.file_uploader("Upload your CSV file to prepare the Raw Data for Summary:", type=["csv"], accept_multiple_files=False)
 
         # Check if a file is uploaded
         if uploaded_file is not None:
@@ -115,76 +122,48 @@ elif selected == "Paid Media":
 
             # Data processing
             if 'Date' in df.columns:
-                df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d %H:%M:%S.%f').dt.strftime('%Y-%m-%d')
-                df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d')
+                df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d %H:%M:%S.%f', errors='coerce').dt.strftime('%Y-%m-%d')
+                df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d', errors='coerce')
+
             columns_to_replace = ['Impressions', 'Clicks', 'Media_Cost', 'Video_Views', 'GRPs']
             df[columns_to_replace] = df[columns_to_replace].fillna(0).replace('', 0)
 
-            # Filtered data subsets
-            filtered_data = {}
+            # Define filtering conditions
+            filter_conditions = {
+                'PW_Beloved': (df['Brand'] == 'Beloved'),
+                'Axe_Cross': (df['Brand'] == 'Axe') & (df['Category'] == 'Cross-category'),
+                'Degree_Cross': (df['Brand'] == 'Degree') & (df['Category'] == 'Cross-category'),
+                'DMC_Cross_MB': (df['Brand'] == 'Dove Men+Care') & df['Category'].isin(["Cross-category","Masterbrand"]),
+                'Dove_Cross': (df['Brand'] == 'Dove') & (df['Category'] == 'Cross-category'),
+                'Dove_MB_Superbowl': (df['Brand'] == 'Dove'),
+                'Degree_Deo': df['Brand'].isin(['Degree', 'Degree Men', 'Degree Women']) & df['Category'].isin(['Deodorants', 'Personal Wash']),
+                'Axe_Deo': (df['Brand'] == 'Axe') & df['Category'].isin(['Deodorants', 'Hair Care', 'Personal Wash']),
+                'DMC_Deo': (df['Brand'] == 'Dove Men+Care') & (df['Category'] == 'Deodorants'),
+                'DMC_PW': (df['Brand'] == 'Dove Men+Care') & (df['Category'] == 'Personal Wash'),
+                'Dove_Deo': (df['Brand'] == 'Dove') & (df['Category'] == 'Deodorants'),
+                'Dove_PW': (df['Brand'] == 'Dove') & (df['Category'] == 'Personal Wash'),
+                'Scale': (df['Brand'] == 'Scale')
+            }
 
-            # 1. Axe Cross-Category
-            Axe_Cross = df[(df['Brand'] == 'Axe') & (df['Category'] == 'Cross-Category')]
-            filtered_data['Axe Cross'] = Axe_Cross
+            # Process and generate individual download buttons
+            for key, condition in filter_conditions.items():
+                filtered_df = df[condition]
 
-            # 2. Degree Cross-Category
-            Degree_Cross = df[(df['Brand'] == 'Degree') & (df['Category'] == 'Cross-Category')]
-            filtered_data['Degree Cross'] = Degree_Cross
+                if not filtered_df.empty:
+                    st.write(f"### {key} Paid Media Raw Data")
+                    
+                    towrite = io.BytesIO()
+                    with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
+                        filtered_df.to_excel(writer, sheet_name=key, index=False)
+                    towrite.seek(0)
 
-            # 3. DMC Cross-Category
-            DMC_Cross = df[(df['Brand'] == 'Dove Men+Care') & (df['Category'] == 'Cross-Category')]
-            filtered_data['DMC Cross'] = DMC_Cross
-
-            # 4. Dove Cross-Category
-            Dove_Cross = df[(df['Brand'] == 'Dove') & (df['Category'] == 'Cross-Category')]
-            filtered_data['Dove Cross'] = Dove_Cross
-
-            # 5. Dove MB + Superbowl
-            Dove_MB_Superbowl = df[df['Brand'] == 'Dove']
-            filtered_data['Dove MB + Superbowl'] = Dove_MB_Superbowl
-
-            # 6. Degree Deo
-            Degree_Deo = df[(df['Brand'].isin(['Degree', 'Degree Men', 'Degree Women'])) & (df['Category'].isin(['Deodorants', 'Personal Wash']))]
-            filtered_data['Degree Deo'] = Degree_Deo
-
-            # 7. Axe Deo
-            Axe_Deo = df[(df['Brand'] == 'Axe') & (df['Category'].isin(['Deodorants', 'Hair Care', 'Personal Wash']))]
-            filtered_data['Axe Deo'] = Axe_Deo
-
-            # 8. DMC Deo
-            DMC_Deo = df[(df['Brand'] == 'Dove Men+Care') & (df['Category'] == 'Deodorants')]
-            filtered_data['DMC Deo'] = DMC_Deo
-
-            # 9. DMC PW
-            DMC_PW = df[(df['Brand'] == 'Dove Men+Care') & (df['Category'] == 'Personal Wash')]
-            filtered_data['DMC PW'] = DMC_PW
-
-            # 10. Dove Deo
-            Dove_Deo = df[(df['Brand'] == 'Dove') & (df['Category'] == 'Deodorants')]
-            filtered_data['Dove Deo'] = Dove_Deo
-
-            # 11. Dove PW
-            Dove_PW = df[(df['Brand'] == 'Dove') & (df['Category'] == 'Personal Wash')]
-            filtered_data['Dove PW'] = Dove_PW
-
-            # 12. Scale
-            Scale = df[df['Brand'] == 'Scale']
-            filtered_data['Scale'] = Scale
-            for key, data in filtered_data.items():
-                st.write(f"{key} Data:")   
-                if not data.empty:
-                                towrite = io.BytesIO()
-                                data.to_excel(towrite, index=False, header=True)
-                                towrite.seek(0)
-                                
-                                st.download_button(
-                                    label=f"Download {key} Raw Data as xlsx",
-                                    data=towrite,
-                                    file_name=f"{key.replace(' ', '_')}_Raw_Data.xlsx",
-                                    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                                )
-                                            # if download_link is not None:
-                                            # st.markdown(download_link, unsafe_allow_html=True)
+                    # Download button for each dataset
+                    st.download_button(
+                        label=f"Download {key} Paid Media Raw Data",
+                        data=towrite,
+                        file_name=f"{key} Paid Media Raw Data.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
 
     if selected == 'Data Cleaning':
         st.subheader("Data Cleaning Process")
@@ -204,9 +183,9 @@ elif selected == "Paid Media":
                 # # 3. Remove empty columns
                 # df = df.dropna(axis=1, how='all')
                 # 4. Duplicate or Non-Duplicate Entry in Rows
-                columns_list = df.columns.difference(['index']).tolist()
-                df["IsDuplicate"] = df.duplicated(subset=columns_list, keep=False)
-                df['Duplicate/Non Duplicate'] = df['IsDuplicate'].map({True: "Duplicate", False: "Non Duplicate"})
+                # columns_list = df.columns.difference(['index']).tolist()
+                # df["IsDuplicate"] = df.duplicated(subset=columns_list, keep=False)
+                # df['Duplicate/Non Duplicate'] = df['IsDuplicate'].map({True: "Duplicate", False: "Non Duplicate"})
                 # 5. Convert Text format to numeric format
                 if 'Impressions' in df.columns:
                     df['Impressions'] = pd.to_numeric(df['Impressions'])
@@ -227,6 +206,11 @@ elif selected == "Paid Media":
                     return ', '.join(negative_columns) if negative_columns else 'No Negative Values'
                 # Create a new column with the results
                 df['Negative Check'] = df.apply(check_negative_values, axis=1)
+
+                #Drop the columns and rename
+                df = df.drop(columns=["MSID", "Load_Date", "File_Name"], errors='ignore')   
+                df = df.rename(columns={"Driver_Type": "Media Type"})
+
                 # Store the modified DataFrame in the session state
                 st.session_state.modified_files[file.name] = df
                 def download_xlsx(df, label, filename):
@@ -265,7 +249,7 @@ elif selected == "Paid Media":
                     col = ['Year','Month','Master_Channel','Channel','Raw_Partner','Audience','Package_Placement_Name']
                     digtal_cost.groupby(col)["Impressions"].sum()
                     
-
+                    
                     #1. Null Media_Cost - Digital,Commerce & Search
 
                     col = ['Year','Month','Master_Channel','Channel','Raw_Partner','Audience','Package_Placement_Name']
@@ -395,6 +379,11 @@ elif selected == "Paid Media":
                     
                     # # Display download button for the Excel file
                     # st.download_button(label='Download Excel File', data=output.getvalue(), file_name='null_value_check_results.xlsx', mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+
+
+
                     break
      
         # Check if "Summary" is selected
@@ -402,7 +391,7 @@ elif selected == "Paid Media":
             st.subheader("Summary Preparation Process")
             option = st.selectbox(
                 "Select the brand to prepare the summary",
-                ("Dove PW", "Dove Deo", "DMC PW", "DMC Deo", "Degree Deo", "Axe Deo", "Dove MB + Superbowl", "Dove Cross", "Degree Cross", "Axe Cross","DMC Cross")
+                ("Dove PW", "Dove Deo", "DMC PW", "DMC Deo", "Degree Deo", "Axe Deo", "Dove MB + Superbowl", "Dove Cross", "Degree Cross Category", "Axe Cross Category","DMC Cross Category")
             )
             st.write("selected:", option)
             
@@ -412,7 +401,7 @@ elif selected == "Paid Media":
                 unsafe_allow_html=True
             )
         #Axe Cross Cateogry Summary:
-            if option == 'Axe Cross':
+            if option == 'Axe Cross Category':
             # Function to download Excel file
                 def download_xlsx(df, label, filename):
                         excel_file = io.BytesIO()
@@ -431,10 +420,19 @@ elif selected == "Paid Media":
                                 values=['Impressions', 'Clicks', 'Media_Cost'], 
                                 index=[Axe_Cross['Date'].dt.to_period('M'), 'Category', 'Brand', 'Master_Channel', 'Channel', 'Campaign', 'Prisma_Campaign_Secondary', 'Raw_Partner', 'Standardized_Partner', 'Audience'],
                                 aggfunc='sum').reset_index()
+                            columns_to_clean = [
+                                'Category', 'Brand', 'Master_Channel', 'Channel', 'Campaign', 
+                                'Prisma_Campaign_Secondary', 'Raw_Partner', 'Standardized_Partner', 'Audience'
+                            ]
+                            Axe_Cross_pivot_table[columns_to_clean] = Axe_Cross_pivot_table[columns_to_clean].replace(0, "")
                             #download_xlsx(Axe_Cross, label='Download Modified File (Mapped)', filename="Axe Cross Category Mapped Raw.xlsx")
-                            download_xlsx(Axe_Cross_pivot_table, label='Download Modified File (Summary)', filename="Axe Cross Category Summary.xlsx")
+                            today_date = datetime.today().strftime('%Y-%m-%d')
+                            # Create the dynamic filename
+                            filename = f"Axe Cross Category Summary {today_date}.xlsx"
+                            download_xlsx(Axe_Cross_pivot_table, label='Download the Axe Cross Category Summary File', filename=filename)
+
         #Degree Cross Cateogry Summary:
-            if option == 'Degree Cross':
+            if option == 'Degree Cross Category':
             # Function to download Excel file
                 def download_xlsx(df, label, filename):
                     excel_file = io.BytesIO()
@@ -453,10 +451,20 @@ elif selected == "Paid Media":
                                 values=['Impressions', 'Clicks', 'Media_Cost'], 
                                 index=[Degree_Cross['Date'].dt.to_period('M'), 'Category', 'Brand', 'Master_Channel', 'Channel', 'Campaign', 'Prisma_Campaign_Secondary', 'Raw_Partner', 'Standardized_Partner', 'Audience'],
                                 aggfunc='sum').reset_index()
-                            #download_xlsx(Degree_Cross, label='Download Modified File (Mapped)', filename="Degree Cross Category Mapped Raw.xlsx")
-                            download_xlsx(Degree_Cross_pivot_table, label='Download Modified File (Summary)', filename="Degree Cross Category Summary.xlsx")
-        #DMC Cross Cateogry Summary:
-            if option == 'DMC Cross':
+                            
+                            columns_to_clean = [
+                                'Category', 'Brand', 'Master_Channel', 'Channel', 'Campaign', 
+                                'Prisma_Campaign_Secondary', 'Raw_Partner', 'Standardized_Partner', 'Audience'
+                            ]
+                            Degree_Cross_pivot_table[columns_to_clean] = Degree_Cross_pivot_table[columns_to_clean].replace(0, "")
+                            
+                            today_date = datetime.today().strftime('%Y-%m-%d')
+                            # Create the dynamic filename
+                            filename = f"Degree Cross Category Summary {today_date}.xlsx"
+                            download_xlsx(Degree_Cross_pivot_table, label='Download the Degree Cross Category Summary File', filename=filename)  
+
+            #DMC Cross Cateogry Summary:
+            if option == 'DMC Cross Category':
             # Function to download Excel file
                 def download_xlsx(df, label, filename):
                     excel_file = io.BytesIO()
@@ -476,9 +484,17 @@ elif selected == "Paid Media":
                                 values=['Impressions', 'Clicks', 'Media_Cost'], 
                                 index=[DMC_Cross['Date'].dt.to_period('M'), 'Category', 'Brand', 'Master_Channel', 'Channel', 'Campaign', 'Prisma_Campaign_Secondary', 'Raw_Partner', 'Standardized_Partner', 'Audience'],
                                 aggfunc='sum').reset_index()
-                            #download_xlsx(DMC_Cross, label='Download Modified File (Mapped)', filename="DMC Cross Category Mapped Raw.xlsx")
-                            download_xlsx(DMC_Cross_pivot_table, label='Download Modified File (Summary)', filename="DMC Cross Category Summary.xlsx")
-        #Dove Cross Cateogry Summary:
+                            columns_to_clean = [
+                                'Category', 'Brand', 'Master_Channel', 'Channel', 'Campaign', 
+                                'Prisma_Campaign_Secondary', 'Raw_Partner', 'Standardized_Partner', 'Audience'
+                            ]
+                            DMC_Cross_pivot_table[columns_to_clean] = DMC_Cross_pivot_table[columns_to_clean].replace(0, "")
+                            today_date = datetime.today().strftime('%Y-%m-%d')
+                            # Create the dynamic filename
+                            filename = f"DMC Cross Category Summary {today_date}.xlsx"
+                            download_xlsx(DMC_Cross_pivot_table, label='Download the DMC Cross Category Summary File', filename=filename) 
+                            
+            #Dove Cross Cateogry Summary:
             if option == 'Dove Cross':
             # Function to download Excel file
                 def download_xlsx(df, label, filename):
@@ -502,7 +518,7 @@ elif selected == "Paid Media":
                             #download_xlsx(DMC_Cross, label='Download Modified File (Mapped)', filename="DMC Cross Category Mapped Raw.xlsx")
                             download_xlsx(Dove_Cross_pivot_table, label='Download Modified File (Summary)', filename="Dove Cross Category Summary.xlsx")
 
-        # Dove + Superbowl Cateogry Summary:
+            # Dove + Superbowl Cateogry Summary:
             if option == 'Dove MB + Superbowl':
                # Function to download the Excel file
                 def download_xlsx_Dove_Superbowl(df, label, filename):
@@ -717,75 +733,219 @@ elif selected == "Paid Media":
           
 
 elif selected == "Non Paid Media":
-    st.subheader("Non Digital Coupon Calculation")
+    st.subheader("Non Paid Media")
+
+
+    # Function to save uploaded files in a folder
+    def save_uploaded_files(uploaded_files, save_dir="uploaded_folder"):
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        
+        file_data = []
+        
+        for uploaded_file in uploaded_files:
+            folder_name = uploaded_file.name.split("/")[0]  # Assuming folder name is part of file name
+            file_name = uploaded_file.name.split("/")[-1]  # Get file name only
+            
+            folder_path = os.path.join(save_dir, folder_name)
+            os.makedirs(folder_path, exist_ok=True)
+
+            file_path = os.path.join(folder_path, file_name)
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            
+            file_data.append({"Folder Name": folder_name, "File Name": file_name, "File Path": file_path})
+        
+        return file_data
+
+    def save_uploaded_files(uploaded_files):
+        file_data = []
+        
+        for uploaded_file in uploaded_files:
+            if uploaded_file.name.endswith(".csv"):
+                df = pd.read_csv(uploaded_file, encoding="latin1")
+            elif uploaded_file.name.endswith((".xls", ".xlsx")):
+                df = pd.read_excel(uploaded_file, engine="openpyxl")  # Read the file
+                    
+            # Process "Email" files
+            if "Email" in uploaded_file.name:  
+                required_columns = ["date", "sent", "cost"]
+                if all(col in df.columns for col in required_columns):
+                    df["date"] = pd.to_datetime(df["date"])  # Convert date column
+                    start_date = df["date"].min()
+                    end_date = df["date"].max()
+                    impressions = df["sent"].sum()
+                    spends = df["cost"].sum()
+                    
+                    # Simulated File Path
+                    file_path = f"/uploaded_files/{uploaded_file.name}"
+
+                    file_data.append({
+                        "File Path": file_path,
+                        "File Name": uploaded_file.name,
+                        "Start Date": start_date,
+                        "End Date": end_date,
+                        "Impressions": impressions,
+                        "Spends": spends
+                    })
+
+            # Process "Website" files
+            if "Website Sessions" in uploaded_file.name:  
+                required_columns = ["Date", "Sessions"]
+                if all(col in df.columns for col in required_columns):
+                    df["Date"] = pd.to_datetime(df["Date"])  # Convert date column
+                    start_date = df["Date"].min()
+                    end_date = df["Date"].max()
+                    impressions = df["Sessions"].sum()
+
+                    # Simulated File Path
+                    file_path = f"/uploaded_files/{uploaded_file.name}"
+
+                    file_data.append({
+                        "File Path": file_path,
+                        "File Name": uploaded_file.name,
+                        "Start Date": start_date,
+                        "End Date": end_date,
+                        "Impressions": impressions,
+                    })
+
+            if "website sessions" in uploaded_file.name:  
+                required_columns = ["Date", "Sessions"]
+                if all(col in df.columns for col in required_columns):
+                    df["Date"] = pd.to_datetime(df["Date"])  # Convert date column
+                    start_date = df["Date"].min()
+                    end_date = df["Date"].max()
+                    impressions = df["Sessions"].sum()
+
+                    # Simulated File Path
+                    file_path = f"/uploaded_files/{uploaded_file.name}"
+
+                    file_data.append({
+                        "File Path": file_path,
+                        "File Name": uploaded_file.name,
+                        "Start Date": start_date,
+                        "End Date": end_date,
+                        "Impressions": impressions,
+                    }) 
+
+            if "all other categories sessions" in uploaded_file.name:  
+                required_columns = ["Date", "Sessions Start"]
+                if all(col in df.columns for col in required_columns):
+                    df["Date"] = pd.to_datetime(df["Date"])  # Convert date column
+                    start_date = df["Date"].min()
+                    end_date = df["Date"].max()
+                    impressions = df["Sessions Start"].sum()
+
+                    # Simulated File Path
+                    file_path = f"/uploaded_files/{uploaded_file.name}"
+
+                    file_data.append({
+                        "File Path": file_path,
+                        "File Name": uploaded_file.name,
+                        "Start Date": start_date,
+                        "End Date": end_date,
+                        "Impressions": impressions,
+                    }) 
+
+
+        return file_data
+
+    def generate_csv(file_data):
+        df = pd.DataFrame(file_data)[["File Path", "File Name", "Start Date", "End Date", "Impressions", "Spends"]]
+        csv_buffer = io.StringIO()
+        df.to_csv(csv_buffer, index=False)
+        return csv_buffer.getvalue()
+
+    st.title("File Upload & Processing")
+
+    uploaded_files = st.file_uploader("Upload multiple files", accept_multiple_files=True)
+
+    if uploaded_files:
+        file_data = save_uploaded_files(uploaded_files)
+
+        if file_data:
+            st.success("Files processed successfully!")
+
+            # Generate CSV
+            csv_file = generate_csv(file_data)
+
+            # Provide CSV for download
+            st.download_button(
+                label="Download CSV with Summary",
+                data=csv_file,
+                file_name="uploaded_files_summary.csv",
+                mime="text/csv"
+            )
+
+
+    # # Text inputs for the user to input dates
+    # input_date_1_str = st.text_input("Enter the first date (dd-mm-yyyy)", "01-05-2024")
+    # input_date_2_str = st.text_input("Enter the second date (dd-mm-yyyy)", "31-05-2024")
     
-    # Text inputs for the user to input dates
-    input_date_1_str = st.text_input("Enter the first date (dd-mm-yyyy)", "01-05-2024")
-    input_date_2_str = st.text_input("Enter the second date (dd-mm-yyyy)", "31-05-2024")
+    # try:
+    #     # Convert input dates to datetime objects
+    #     input_date_1 = pd.to_datetime(input_date_1_str, format='%d-%m-%Y')
+    #     input_date_2 = pd.to_datetime(input_date_2_str, format='%d-%m-%Y')
+    #     days_between_inputs = (input_date_2 - input_date_1).days
+    #     st.write(f"Number of days between {input_date_1.date()} and {input_date_2.date()} is: {days_between_inputs + 1} days")
+    # except ValueError:
+    #     st.write("Please enter valid dates in the format dd-mm-yyyy.")
     
-    try:
-        # Convert input dates to datetime objects
-        input_date_1 = pd.to_datetime(input_date_1_str, format='%d-%m-%Y')
-        input_date_2 = pd.to_datetime(input_date_2_str, format='%d-%m-%Y')
-        days_between_inputs = (input_date_2 - input_date_1).days
-        st.write(f"Number of days between {input_date_1.date()} and {input_date_2.date()} is: {days_between_inputs + 1} days")
-    except ValueError:
-        st.write("Please enter valid dates in the format dd-mm-yyyy.")
-    
-    # File uploader for non-digital coupon file
-    uploaded_file = st.file_uploader("Choose a Non Digital Coupon File", type=['xlsx'])
+    # # File uploader for non-digital coupon file
+    # uploaded_file = st.file_uploader("Choose a Non Digital Coupon File", type=['xlsx'])
 
-    if uploaded_file is not None:
-        # Read the uploaded Excel file
-        df = pd.read_excel(uploaded_file)
-        # Display some information More More Feature More Feature the uploaded file
-        st.write("### Uploaded the Non Digital Coupon File:")
-        st.write(df)
+    # if uploaded_file is not None:
+    #     # Read the uploaded Excel file
+    #     df = pd.read_excel(uploaded_file)
+    #     # Display some information More More Feature More Feature the uploaded file
+    #     st.write("### Uploaded the Non Digital Coupon File:")
+    #     st.write(df)
 
-        # Ensure the date columns are in datetime format
-        df['Issue_Date'] = pd.to_datetime(df['Issue_Date'], format='%Y-%m-%d')
-        df['Expire_Date'] = pd.to_datetime(df['Expire_Date'], format='%Y-%m-%d')
+    #     # Ensure the date columns are in datetime format
+    #     df['Issue_Date'] = pd.to_datetime(df['Issue_Date'], format='%Y-%m-%d')
+    #     df['Expire_Date'] = pd.to_datetime(df['Expire_Date'], format='%Y-%m-%d')
 
-        # Calculate the Expire_Date(DP) column
-        df['Expire_Date(DP)'] = df.apply(
-            lambda row: row['Issue_Date'] + pd.DateOffset(weeks=8) 
-            if row['ConsumerRedemptionPeriod'] in [9, 10] 
-            else row['Expire_Date'], 
-            axis=1
-        )
+    #     # Calculate the Expire_Date(DP) column
+    #     df['Expire_Date(DP)'] = df.apply(
+    #         lambda row: row['Issue_Date'] + pd.DateOffset(weeks=8) 
+    #         if row['ConsumerRedemptionPeriod'] in [9, 10] 
+    #         else row['Expire_Date'], 
+    #         axis=1
+    #     )
 
-        # Calculate the number of overlapping days with the input date range
-        def calculate_overlapping_days(row, start_date, end_date):
-            if (start_date >= row['Issue_Date'] and end_date <= row['Expire_Date(DP)']) or (start_date < row['Expire_Date(DP)'] and end_date > row['Issue_Date']):
-                return (min(row['Expire_Date(DP)'], end_date) - max(row['Issue_Date'], start_date)).days + 1
-            else:
-                return 0
+    #     # Calculate the number of overlapping days with the input date range
+    #     def calculate_overlapping_days(row, start_date, end_date):
+    #         if (start_date >= row['Issue_Date'] and end_date <= row['Expire_Date(DP)']) or (start_date < row['Expire_Date(DP)'] and end_date > row['Issue_Date']):
+    #             return (min(row['Expire_Date(DP)'], end_date) - max(row['Issue_Date'], start_date)).days + 1
+    #         else:
+    #             return 0
 
-        df['Date Range'] = df.apply(calculate_overlapping_days, axis=1, start_date=input_date_1, end_date=input_date_2)
+    #     df['Date Range'] = df.apply(calculate_overlapping_days, axis=1, start_date=input_date_1, end_date=input_date_2)
 
-        # Calculate the final cost
-        df['Final Cost'] = df['WeeklyCost'] / 7 * df['Date Range']
+    #     # Calculate the final cost
+    #     df['Final Cost'] = df['WeeklyCost'] / 7 * df['Date Range']
 
-        # Display the updated DataFrame with the new columns including Final Cost
-        st.write("### Calculated Non Digital Coupon Data:")
-        st.write(df)
+    #     # Display the updated DataFrame with the new columns including Final Cost
+    #     st.write("### Calculated Non Digital Coupon Data:")
+    #     st.write(df)
 
-        # Optionally, allow the user to download the updated DataFrame as an Excel file
-        @st.cache_data
-        def convert_df_to_excel(df):
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False, sheet_name='Sheet1')
-            return output.getvalue()
+    #     # Optionally, allow the user to download the updated DataFrame as an Excel file
+    #     @st.cache_data
+    #     def convert_df_to_excel(df):
+    #         output = io.BytesIO()
+    #         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+    #             df.to_excel(writer, index=False, sheet_name='Sheet1')
+    #         return output.getvalue()
 
-        excel_data = convert_df_to_excel(df)
+    #     excel_data = convert_df_to_excel(df)
 
-        st.download_button(
-            label="Download updated file as Excel",
-            data=excel_data,
-            file_name="updated_coupon_file.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+    #     st.download_button(
+    #         label="Download updated file as Excel",
+    #         data=excel_data,
+    #         file_name="updated_coupon_file.xlsx",
+    #         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    #     )
+
 elif selected == "Competition":
     st.subheader("Pathmatics")
     # Upload the file
@@ -1150,15 +1310,7 @@ elif selected == "Nielsen":
                 "No Promo $",
                 "Feat & Disp $",
                 "Any Disp $",
-                "Any Feat $",
-                "Disp w/o Feat Unit Price",
-                "Feat w/o Disp Unit Price",
-                "Feat & Disp Unit Price",
-                "Any Disp Unit Price",
-                "Any Feat Unit Price",
-                "Disp w/o Feat $",
-                "Feat w/o Disp $",
-                "Any Promo %ACV"
+                "Any Feat $"
             ]
             Nielsen_Raw_Data = Nielsen_Raw_Data[desired_order]
             merged_rows = Nielsen_Raw_Data.shape[0]
@@ -1514,7 +1666,7 @@ elif selected == "Nielsen":
     if __name__ == "__main__":
         main()
             
-    # Add content for Nielsen here
+    # Add content for Playgourd here
 elif selected == "Playground":
     st.subheader(f"You have selected {selected}")
 
@@ -1535,125 +1687,2234 @@ elif selected == "Playground":
         csv_file.seek(0)
         st.download_button(label=label, data=csv_file, file_name=filename, mime="text/csv")
 
-    def sidebar_filters_1(data):
-        
-        st.sidebar.header("Filter for combined RROI File")
-        Brand = st.sidebar.multiselect("Select the Brand:",options=data["Brand"].unique(),)
-        data = data[data["Brand"].isin(Brand)]
-        year = st.sidebar.multiselect("Select the Year:",options=data["Year"].unique(),)
-        data = data[data["Year"].isin(year)]
-        Month = st.sidebar.multiselect("Select the Month:",options=data["Month"].unique(),)
-        data = data[data["Month"].isin(Month)]
-        
-        return data
-
-    def generate_pivot_table_1(filtered_data):
-
-        filtered_data['Cost'] = pd.to_numeric(filtered_data['Cost'], errors='coerce')
-        filtered_data['Impression'] = pd.to_numeric(filtered_data['Impression'], errors='coerce')
-        filtered_data = filtered_data.dropna(subset=['Cost', 'Impression'])
-        pivot_table = filtered_data.pivot_table(index=['Brand','Year', 'Month'], values=['Cost', 'Impression'], aggfunc='sum')
-        pivot_table.reset_index(inplace=False)
-        return pivot_table
-
-    def sidebar_filters_2(data):
-        
-        st.sidebar.header("Filter for AI RROI File")
-        year = st.sidebar.multiselect("Select the Year:",options=data["Year"].unique(),key="year_multiselect")
-        data = data[data["Year"].isin(year)]
-        Month = st.sidebar.multiselect("Select the Month:",options=data["Month"].unique(),key="month_multiselect")
-        data = data[data["Month"].isin(Month)]
-
-        return data
-
-    def generate_pivot_table_2(filtered_data):
-        # Convert the 'Cost' and 'Impression' columns to numeric, forcing errors to NaN
-        filtered_data['Cost'] = pd.to_numeric(filtered_data['Cost'], errors='coerce')
-        filtered_data['Impression'] = pd.to_numeric(filtered_data['Impression'], errors='coerce')
-        # Drop rows with NaN values in 'Cost' or 'Impression' columns
-        filtered_data = filtered_data.dropna(subset=['Cost', 'Impression'])
-        # Generate the pivot table
-        pivot_table = filtered_data.pivot_table(index=['Year', 'Month'], values=['Cost', 'Impression'], aggfunc='sum')
-        # Reset the index to turn the pivot table into a regular DataFrame
-        pivot_table.reset_index(inplace=False)
-        return pivot_table
         
     with st.sidebar:
         initialize_session_state()
-        selected = st.selectbox("Main Menu", ["Home", 'Dimensions Check','Metrics Check'], index=0)
+        selected = st.selectbox("Main Menu", ['Data Preparation','Data Validation(Metrics)','Data Validation(dimensions)'], index=0)
 
-    if selected == "Dimensions Check":
-        st.subheader("Dimensions Check")
-        Dimensions_Check = st.file_uploader("Upload your Excel file(s)", type=["xlsx"], accept_multiple_files=True)
-        dataframes_check = []
-        if Dimensions_Check:
-            for file in Dimensions_Check:
-                Dimensions_Check_df = pd.read_excel(file)
-                dataframes_check.append(Dimensions_Check_df)
-            st.write(Dimensions_Check_df)
 
-        Dimensions_RROI = st.file_uploader("Upload your Csv file(s)", type=["csv"], accept_multiple_files=True)           
-        dataframes_rroi = []
-        if Dimensions_RROI:
-            for file in Dimensions_RROI:
-                Dimensions_RROI_df = pd.read_csv(file)
-                dataframes_rroi.append(Dimensions_RROI_df)
-            st.write(Dimensions_RROI_df)
+    if selected == "Data Preparation":
+        with st.sidebar:
+            initialize_session_state()
+            selected = st.selectbox("Main Menu", ['PC DEO AXE','PC DEO DEGREE FEMALE','PC DEO DEGREE MALE','PC DEO DMC','PC PW DMC','PC DEO DOVE','PC PW DOVE BAR','PC PW DOVE BW','BnW HAIR Shea Moisture','BnW HAIR Tresemme','BnW SKIN Vaseline','BnW HAIR Nexxus','BnW HAIR Dove',"NIC ICE Breyer's",'NIC ICE Klondike','NIC ICE Talenti','NIC ICE Yasso',"NIC Mayo Hellmann's","NIC SCKRAID Knorr Bouillon","NIC SCKRAID Knorr Sides"], index=0)
+       
+        if selected == "PC DEO AXE":
+            st.subheader("PC DEO AXE")    
+            Axe_PG_Data_Preparation = st.file_uploader("Upload your DEO Axe RROI Excel file", type=["xlsx"], accept_multiple_files=True)
+            if Axe_PG_Data_Preparation:
+                for Axe_PG_Data_Preparation_df in Axe_PG_Data_Preparation:
+                    try:
+                        df = pd.read_excel(Axe_PG_Data_Preparation_df)
+
+                        #DEO Axe Playground Preparation
+                        if 'Feature ID' in df.columns:
+                            df = df.drop(columns=['Feature ID','Model Scope','Input Brand','Input Category','Upload Date','Modified Date','Model Scope Alias','Year-Month'])
+                        
+                        if "Axe" in Axe_PG_Data_Preparation_df.name:
+                            df["Organisation"] = "Unilever"
+                            df["Business Unit"] = "Personal Care"
+                            df["Category"] = "Deodorant"
+                            df["Sub category"] = "Axe"
+                            df["Brand"] = "PC Deo Axe"
+                            df["Total Brand"] = "PC Deo Axe"
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                coupon_filter = df['Media Type'] == "Coupon"
+                                df.loc[coupon_filter, 'Platform'] = df.loc[coupon_filter, 'Product Line']
+                                df.loc[coupon_filter, 'Product Line'] = None
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel/Daypart' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Earned Media"
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = df.loc[Earned_Media_filter, 'Product Line']
+                                df.loc[Earned_Media_filter, 'Product Line'] = None  
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel/Daypart' in df.columns:
+                                Non_Media_filter = df['Media Type'] == "Non Media"
+                                df.loc[Non_Media_filter, 'Channel/Daypart'] = df.loc[Non_Media_filter, 'Product Line']
+                                df.loc[Non_Media_filter, 'Product Line'] = None 
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                Owned_Media_filter = df['Media Type'] == "Owned Media"
+                                df.loc[Owned_Media_filter, 'Platform'] = df.loc[Owned_Media_filter, 'Product Line']
+                                df.loc[Owned_Media_filter, 'Product Line'] = None
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                df['Media Type'] = df['Media Type'].replace('Shopper', 'Coupon')
+                                coupon_Shopper_filter = df['Media Type'] == "Coupon"
+                                df.loc[coupon_Shopper_filter, 'Platform'] = df.loc[coupon_Shopper_filter, 'Product Line']
+                                df.loc[coupon_Shopper_filter, 'Product Line'] = None
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                df['Media Type'] = df['Media Type'].replace('Shopper', 'Coupon')
+                                coupon_Shopper_filter = df['Media Type'] == "Coupon"
+                                df.loc[coupon_Shopper_filter, 'Platform'] = df.loc[coupon_Shopper_filter, 'Product Line']
+                                df.loc[coupon_Shopper_filter, 'Product Line'] = None
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Media Type'] == "Trade Promo"
+                                df.loc[trade_promo_filter, 'Channel/Daypart'] = (
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+                                df.loc[trade_promo_filter, 'Master Channel'] = None
+
+                            if 'Master Channel' in df.columns and 'Daypart' not in df.columns:
+                                df['Daypart'] = None
+                            if 'Master Channel' in df.columns:
+                                Master_Channel_TV_filter = df['Master Channel'] == "TV"
+                                df.loc[Master_Channel_TV_filter, 'Daypart'] = df.loc[Master_Channel_TV_filter, 'Channel/Daypart']
+                                df.loc[Master_Channel_TV_filter, 'Channel/Daypart'] = "TV"
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = df['Product Line'] == "TV"
+                                df.loc[Product_line_TV_filter, 'Daypart'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = "TV"
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None  
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = df['Product Line'] == "Digital"
+                                df.loc[Product_line_TV_filter, 'Channel/Daypart'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = "Digital"
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None  
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = df['Product Line'] == "Coupon"
+                                df.loc[Product_line_TV_filter, 'Platform'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = "Coupon"
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = df['Product Line'] == "Commerce & Search"
+                                df.loc[Product_line_TV_filter, 'Channel/Daypart'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = "Commerce & Search"
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None  
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                df['Platform'] = df['Platform'].replace('Facebook', 'Facebook page Post')
+                                df['Platform'] = df['Platform'].replace('Instagram', 'Instagram page Post')
+                                df['Platform'] = df['Platform'].replace('Twitter', 'Twitter page Post')                                         
+                                df['Platform'] = df['Platform'].replace('Web Traffic', 'Web_Analytics')
+                                df['Master Channel'] = df['Master Channel'].replace('Baseline', ' ')
+                                df['Master Channel'] = df['Master Channel'].replace('Recipients', ' ')
+                                df['Master Channel'] = df['Master Channel'].replace('Sessions', ' ')
+                                    
+                            if 'Channel/Daypart' in df.columns:
+                                Product_line_TV_filter = df['Channel/Daypart'] == "Trends"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Category'), 'Channel/Daypart'] = "Trends Category"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Channel/Daypart' in df.columns:
+                                Product_line_TV_filter = df['Channel/Daypart'] == "Seasonality"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Monthly'), 'Channel/Daypart'] = "Seasonality Monthly"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Master Channel'] == "Coupon"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Master Channel'] = None
+
+                        df['Normalized Cost'] = (df['Cost'])
+                        df['Normalized Impression'] = (df['Impression'])
+                        df.rename(columns={"Channel/Daypart": "Channel"}, inplace=True)
+                        df['Platform'] = df['Platform'].replace("NonDigital", "Non-Digital")
+                        df[['Influencer Say','Color Code','Data Through']] = ''
+                        column_order = [
+                            "Organisation", "Business Unit", "Category", "Sub category", "Brand", "Total Brand",
+                            "Model", "Media Type", "Product Line", "Master Channel", "Channel", "Platform", 
+                            "Influencer Say", "Color Code", "Audience", "Daypart", "Year", "Month", "Data Through", 
+                            "Cost", "Normalized Cost", "Impression", "Normalized Impression", 
+                            "Offline Dollar Sales", "Offline Volume", "Offline ROI", 
+                            "Online Dollar Sales", "Online Volume", "Online ROI", 
+                            "Overall Dollar Sales", "Overall Volume", "Overall ROI"
+                        ]
+                        df = df[column_order]
+                        
+                        last_year = df['Year'].iloc[-1]
+                        last_month = df['Month'].iloc[-1]
+                        df['Data Through'] = pd.to_datetime(f"{last_year}-{last_month}-01") + pd.offsets.MonthEnd(0)
+                        df['Data Through'] = df['Data Through'].dt.strftime('%b\'%y')
+                                                # Display the processed DataFrame
+                        st.write(f"Processed DataFrame for: {Axe_PG_Data_Preparation_df.name}")
+                        st.dataframe(df)
+
+                        @st.cache_data
+                        def convert_df_to_csv(dataframe):
+                            return dataframe.to_csv(index=False).encode('utf-8')
+
+                        csv_data = convert_df_to_csv(df)
+
+                        st.download_button(
+                            label="Download DEO Axe Playground Processed CSV",
+                            data=csv_data,
+                            file_name="DEO_Axe_Playground_Processed_Data.csv",
+                            mime='text/csv'
+                        )
+                    except Exception as e:
+                        st.error(f"Error processing {Axe_PG_Data_Preparation_df.name}: {e}")
+                
+        if selected == "PC DEO DEGREE FEMALE":
+            st.subheader("PC DEO DEGREE FEMALE")  
+            Degree_Female_PG_Data_Preparation = st.file_uploader("Upload your Deo Degree Female RROI file", type=["xlsx"], accept_multiple_files=True)
+            if Degree_Female_PG_Data_Preparation:
+                for Degree_Female_PG_Data_Preparation_df in Degree_Female_PG_Data_Preparation:
+                    try:
+                        df = pd.read_excel(Degree_Female_PG_Data_Preparation_df)
+
+                        #DEO Degree Female Playground Preparation
+                        if 'Feature ID' in df.columns:
+                            df = df.drop(columns=['Feature ID','Model Scope','Input Brand','Input Category','Upload Date','Modified Date','Model Scope Alias','Year-Month'])
+                        
+                        if "DegreeFEMALE" in Degree_Female_PG_Data_Preparation_df.name:
+                            df["Organisation"] = "Unilever"
+                            df["Business Unit"] = "Personal Care"
+                            df["Category"] = "Deodorant"
+                            df["Sub category"] = "Degree"
+                            df["Brand"] = "PC Deo Degree Female"
+                            df["Total Brand"] = "PC Deo Degree"
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                coupon_filter = df['Media Type'] == "Coupon"
+                                df.loc[coupon_filter, 'Platform'] = df.loc[coupon_filter, 'Product Line']
+                                df.loc[coupon_filter, 'Product Line'] = None
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel/Daypart' in df.columns:
+                                Non_Media_filter = df['Media Type'] == "Non Media"
+                                df.loc[Non_Media_filter, 'Channel/Daypart'] = df.loc[Non_Media_filter, 'Product Line']
+                                df.loc[Non_Media_filter, 'Product Line'] = None 
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                Owned_Media_filter = df['Media Type'] == "Owned Media"
+                                df.loc[Owned_Media_filter, 'Platform'] = df.loc[Owned_Media_filter, 'Product Line']
+                                df.loc[Owned_Media_filter, 'Product Line'] = None
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Media Type'] == "Trade Promo"
+                                df.loc[trade_promo_filter, 'Channel/Daypart'] = (
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+                                df.loc[trade_promo_filter, 'Master Channel'] = None
+
+                            if 'Master Channel' in df.columns and 'Daypart' not in df.columns:
+                                df['Daypart'] = None
+                            if 'Master Channel' in df.columns:
+                                Master_Channel_TV_filter = df['Master Channel'] == "TV"
+                                df.loc[Master_Channel_TV_filter, 'Daypart'] = df.loc[Master_Channel_TV_filter, 'Channel/Daypart']
+                                df.loc[Master_Channel_TV_filter, 'Channel/Daypart'] = "TV"
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Product Line'] == "PR")
+                                df.loc[Product_line_TV_filter, 'Channel/Daypart'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Product Line'] == "Influencer")
+                                df.loc[Product_line_TV_filter, 'Channel/Daypart'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = df['Product Line'] == "Web Traffic"
+                                df.loc[Product_line_TV_filter, 'Platform'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = df['Product Line'] == "Shopper"
+                                df.loc[Product_line_TV_filter, 'Platform'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None  
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = df['Product Line'] == "Others"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None  
+
+                            if 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                df['Platform'] = df['Platform'].replace('Facebook', 'Facebook page Post')
+                                df['Platform'] = df['Platform'].replace('Instagram', 'Instagram page Post')
+                                df['Platform'] = df['Platform'].replace('Twitter', 'Twitter page Post')                                         
+                                df['Platform'] = df['Platform'].replace('Web Traffic', 'Web_Analytics')
+                                df['Master Channel'] = df['Master Channel'].replace('Baseline', ' ')
+                                df['Master Channel'] = df['Master Channel'].replace('Sessions', ' ')
+                                    
+                            if 'Channel/Daypart' in df.columns:
+                                Product_line_TV_filter = df['Channel/Daypart'] == "Trends"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Category'), 'Channel/Daypart'] = "Trends Category"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Channel/Daypart' in df.columns:
+                                Product_line_TV_filter = df['Channel/Daypart'] == "Seasonality"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Monthly'), 'Channel/Daypart'] = "Seasonality Monthly"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Coupon"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Platform'] = df.loc[trade_promo_filter, 'Master Channel']
+                                df.loc[trade_promo_filter, 'Master Channel'] = None
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+                                
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "PW"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+                                
+                        df['Normalized Cost'] = (df['Cost']/2)
+                        df['Normalized Impression'] = (df['Impression']/2)
+                        df.rename(columns={"Channel/Daypart": "Channel"}, inplace=True)
+                        df['Platform'] = df['Platform'].replace("NonDigital", "Non-Digital")
+                        df[['Influencer Say','Color Code','Data Through']] = ''
+                        column_order = [
+                            "Organisation", "Business Unit", "Category", "Sub category", "Brand", "Total Brand",
+                            "Model", "Media Type", "Product Line", "Master Channel", "Channel", "Platform", 
+                            "Influencer Say", "Color Code", "Audience", "Daypart", "Year", "Month", "Data Through", 
+                            "Cost", "Normalized Cost", "Impression", "Normalized Impression", 
+                            "Offline Dollar Sales", "Offline Volume", "Offline ROI", 
+                            "Online Dollar Sales", "Online Volume", "Online ROI", 
+                            "Overall Dollar Sales", "Overall Volume", "Overall ROI"
+                        ]
+                        df = df[column_order]
+                        
+                        last_year = df['Year'].iloc[-1]
+                        last_month = df['Month'].iloc[-1]
+                        df['Data Through'] = pd.to_datetime(f"{last_year}-{last_month}-01") + pd.offsets.MonthEnd(0)
+                        df['Data Through'] = df['Data Through'].dt.strftime('%b\'%y')
+                        st.write(f"Processed DataFrame for: {Degree_Female_PG_Data_Preparation_df.name}")
+                        st.dataframe(df)
+
+                        @st.cache_data
+                        def convert_df_to_csv(dataframe):
+                            return dataframe.to_csv(index=False).encode('utf-8')
+
+                        csv_data = convert_df_to_csv(df)
+
+                        st.download_button(
+                            label="Download DEO DEGREE FEMALE Playground Processed CSV",
+                            data=csv_data,
+                            file_name="DEO_DEGREE_FEMALE_Playground_Processed_Data.csv",
+                            mime='text/csv'
+                        )
+                    except Exception as e:
+                        st.error(f"Error processing {Degree_Female_PG_Data_Preparation_df.name}: {e}")
+
+        if selected == "PC DEO DEGREE MALE":
+            st.subheader("PC DEO DEGREE MALE") 
+            Degree_Male_PG_Data_Preparation = st.file_uploader("Upload your Deo Degree Male RROI file", type=["xlsx"], accept_multiple_files=True)
+            if Degree_Male_PG_Data_Preparation:
+                for Degree_Male_PG_Data_Preparation_df in Degree_Male_PG_Data_Preparation:
+                    try:
+                        df = pd.read_excel(Degree_Male_PG_Data_Preparation_df)
+
+                        #DEO Degree Male Playground Preparation
+                        if 'Feature ID' in df.columns:
+                            df = df.drop(columns=['Feature ID','Model Scope','Input Brand','Input Category','Upload Date','Modified Date','Model Scope Alias','Year-Month'])
+                        
+                        if "DegreeMALE" in Degree_Male_PG_Data_Preparation_df.name:
+                            df["Organisation"] = "Unilever"
+                            df["Business Unit"] = "Personal Care"
+                            df["Category"] = "Deodorant"
+                            df["Sub category"] = "Degree"
+                            df["Brand"] = "PC Deo Degree Male"
+                            df["Total Brand"] = "PC Deo Degree"
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                coupon_filter = df['Media Type'] == "Coupon"
+                                df.loc[coupon_filter, 'Platform'] = df.loc[coupon_filter, 'Product Line']
+                                df.loc[coupon_filter, 'Product Line'] = None
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel/Daypart' in df.columns:
+                                Non_Media_filter = df['Media Type'] == "Non Media"
+                                df.loc[Non_Media_filter, 'Channel/Daypart'] = df.loc[Non_Media_filter, 'Product Line']
+                                df.loc[Non_Media_filter, 'Product Line'] = None 
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                Owned_Media_filter = df['Media Type'] == "Owned Media"
+                                df.loc[Owned_Media_filter, 'Platform'] = df.loc[Owned_Media_filter, 'Product Line']
+                                df.loc[Owned_Media_filter, 'Product Line'] = None
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Media Type'] == "Trade Promo"
+                                df.loc[trade_promo_filter, 'Channel/Daypart'] = (
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+                                df.loc[trade_promo_filter, 'Master Channel'] = None
+
+                            if 'Master Channel' in df.columns and 'Daypart' not in df.columns:
+                                df['Daypart'] = None
+                            if 'Master Channel' in df.columns:
+                                Master_Channel_TV_filter = df['Master Channel'] == "TV"
+                                df.loc[Master_Channel_TV_filter, 'Daypart'] = df.loc[Master_Channel_TV_filter, 'Channel/Daypart']
+                                df.loc[Master_Channel_TV_filter, 'Channel/Daypart'] = "TV"
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Product Line'] == "PR")
+                                df.loc[Product_line_TV_filter, 'Channel/Daypart'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Product Line'] == "Influencer")
+                                df.loc[Product_line_TV_filter, 'Channel/Daypart'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = df['Product Line'] == "Web Traffic"
+                                df.loc[Product_line_TV_filter, 'Platform'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = df['Product Line'] == "Shopper"
+                                df.loc[Product_line_TV_filter, 'Platform'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None  
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = df['Product Line'] == "Others"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None  
+
+                            if 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                df['Platform'] = df['Platform'].replace('Facebook', 'Facebook page Post')
+                                df['Platform'] = df['Platform'].replace('Instagram', 'Instagram page Post')
+                                df['Platform'] = df['Platform'].replace('Twitter', 'Twitter page Post')                                         
+                                df['Platform'] = df['Platform'].replace('Web Traffic', 'Web_Analytics')
+                                df['Master Channel'] = df['Master Channel'].replace('Baseline', ' ')
+                                df['Master Channel'] = df['Master Channel'].replace('Sessions', ' ')
+                                    
+                            if 'Channel/Daypart' in df.columns:
+                                Product_line_TV_filter = df['Channel/Daypart'] == "Trends"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Category'), 'Channel/Daypart'] = "Trends Category"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Channel/Daypart' in df.columns:
+                                Product_line_TV_filter = df['Channel/Daypart'] == "Seasonality"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Monthly'), 'Channel/Daypart'] = "Seasonality Monthly"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Coupon"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Platform'] = df.loc[trade_promo_filter, 'Master Channel']
+                                df.loc[trade_promo_filter, 'Master Channel'] = None
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+                                
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "PW"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+                                
+                        df['Normalized Cost'] = (df['Cost']/2)
+                        df['Normalized Impression'] = (df['Impression']/2)
+                        df['Platform'] = df['Platform'].replace("NonDigital", "Non-Digital")
+                        df.rename(columns={"Channel/Daypart": "Channel"}, inplace=True)
+                        df[['Influencer Say','Color Code','Data Through']] = ''
+                        column_order = [
+                            "Organisation", "Business Unit", "Category", "Sub category", "Brand", "Total Brand",
+                            "Model", "Media Type", "Product Line", "Master Channel", "Channel", "Platform", 
+                            "Influencer Say", "Color Code", "Audience", "Daypart", "Year", "Month", "Data Through", 
+                            "Cost", "Normalized Cost", "Impression", "Normalized Impression", 
+                            "Offline Dollar Sales", "Offline Volume", "Offline ROI", 
+                            "Online Dollar Sales", "Online Volume", "Online ROI", 
+                            "Overall Dollar Sales", "Overall Volume", "Overall ROI"
+                        ]
+                        df = df[column_order]
+                        
+                        last_year = df['Year'].iloc[-1]
+                        last_month = df['Month'].iloc[-1]
+                        df['Data Through'] = pd.to_datetime(f"{last_year}-{last_month}-01") + pd.offsets.MonthEnd(0)
+                        df['Data Through'] = df['Data Through'].dt.strftime('%b\'%y')
+                        st.write(f"Processed DataFrame for: {Degree_Male_PG_Data_Preparation_df.name}")
+                        st.dataframe(df)
+
+                        @st.cache_data
+                        def convert_df_to_csv(dataframe):
+                            return dataframe.to_csv(index=False).encode('utf-8')
+
+                        csv_data = convert_df_to_csv(df)
+
+                        st.download_button(
+                            label="DEO DEGREE MALE Download Playground Processed CSV",
+                            data=csv_data,
+                            file_name="DEO_DEGREE_MALE_Playground_Processed_Data.csv",
+                            mime='text/csv'
+                        )
+                    except Exception as e:
+                        st.error(f"Error processing {Degree_Male_PG_Data_Preparation_df.name}: {e}")
+       
+        if selected == "PC PW DMC":
+            st.subheader("PC PW DMC")  
+            PW_DMC_PG_Data_Preparation = st.file_uploader("Upload your PW DMC RROI file", type=["xlsx"], accept_multiple_files=True)
+            if PW_DMC_PG_Data_Preparation:
+                for PW_DMC_Data_Preparation_df in PW_DMC_PG_Data_Preparation:
+                    try:
+                        df = pd.read_excel(PW_DMC_Data_Preparation_df)
+
+                        #DEO Axe Playground Preparation
+                        if 'Feature ID' in df.columns:
+                            df = df.drop(columns=['Feature ID','Model Scope','Input Brand','Input Category','Upload Date','Modified Date','Model Scope Alias','Year-Month'])
+                        
+                        if "PW_DMC" in PW_DMC_Data_Preparation_df.name:
+                            df["Organisation"] = "Unilever"
+                            df["Business Unit"] = "Personal Care"
+                            df["Category"] = "Skin Cleansing"
+                            df["Sub category"] = "PW DMC"
+                            df["Brand"] = "PC PW DMC"
+                            df["Total Brand"] = "PC PW DMC"
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel/Daypart' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Earned Media"
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = df.loc[Earned_Media_filter, 'Product Line']
+                                df.loc[Earned_Media_filter, 'Product Line'] = None  
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel/Daypart' in df.columns:
+                                Non_Media_filter = df['Media Type'] == "Non Media"
+                                df.loc[Non_Media_filter, 'Channel/Daypart'] = df.loc[Non_Media_filter, 'Product Line']
+                                df.loc[Non_Media_filter, 'Product Line'] = None 
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                Owned_Media_filter = df['Media Type'] == "Owned Media"
+                                df.loc[Owned_Media_filter, 'Platform'] = df.loc[Owned_Media_filter, 'Product Line']
+                                df.loc[Owned_Media_filter, 'Product Line'] = None
+
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                df['Platform'] = df['Platform'].replace('Facebook', 'Facebook page Post')
+                                df['Platform'] = df['Platform'].replace('Instagram', 'Instagram page Post')
+                                df['Platform'] = df['Platform'].replace('Twitter', 'Twitter page Post')                                         
+                                df['Platform'] = df['Platform'].replace('Web Traffic', 'Web_Analytics')
+                                df['Master Channel'] = df['Master Channel'].replace('Baseline', ' ')
+                                df['Master Channel'] = df['Master Channel'].replace('Recipients', ' ')
+                                df['Master Channel'] = df['Master Channel'].replace('Sessions', ' ')
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                df['Media Type'] = df['Media Type'].replace('Shopper', 'Coupon')
+                                coupon_Shopper_filter = df['Media Type'] == "Coupon"
+                                df.loc[coupon_Shopper_filter, 'Platform'] = df.loc[coupon_Shopper_filter, 'Product Line']
+                                df.loc[coupon_Shopper_filter, 'Product Line'] = None
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Media Type'] == "Trade Promo"
+                                df.loc[trade_promo_filter, 'Channel/Daypart'] = (
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+                                df.loc[trade_promo_filter, 'Master Channel'] = None
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Master Channel'] == "Earned Media"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Master Channel'] = None 
+                                df.loc[trade_promo_filter, 'Product Line'] = None   
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Master Channel'] == "Paid Media"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Master Channel'] = None 
+                                df.loc[trade_promo_filter, 'Product Line'] = None 
+
+                            if 'Media Type' in df.columns:
+                                trade_promo_filter = df['Media Type'] == "Masterbrand"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None 
+
+                            if 'Media Type' in df.columns:
+                                trade_promo_filter = df['Media Type'] == "Halo"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None 
+
+
+                            if 'Master Channel' in df.columns and 'Daypart' not in df.columns:
+                                df['Daypart'] = None
+                            if 'Master Channel' in df.columns:
+                                Master_Channel_TV_filter = df['Master Channel'] == "TV"
+                                df.loc[Master_Channel_TV_filter, 'Daypart'] = df.loc[Master_Channel_TV_filter, 'Channel/Daypart']
+                                df.loc[Master_Channel_TV_filter, 'Channel/Daypart'] = "TV" 
+
+                            if 'Channel/Daypart' in df.columns:
+                                Product_line_TV_filter = df['Channel/Daypart'] == "Trends"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Category'), 'Channel/Daypart'] = "Trends Category"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Master Channel'] == "PR")
+                                df.loc[Product_line_TV_filter, 'Channel/Daypart'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None 
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Master Channel'] == "Influencer")
+                                df.loc[Product_line_TV_filter, 'Channel/Daypart'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None 
+
+                            if 'Channel/Daypart' in df.columns:
+                                Product_line_TV_filter = df['Channel/Daypart'] == "Seasonality"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Monthly'), 'Channel/Daypart'] = "Seasonality Monthly"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Master Channel'] == "Coupon"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Master Channel'] = None
+                        
+
+                        df['Normalized Cost'] = (df['Cost'])
+                        df['Normalized Impression'] = (df['Impression'])
+                        df['Daypart'] = df['Daypart'].replace('TV', '')
+                        df['Platform'] = df['Platform'].replace("NonDigital", "Non-Digital")
+                        #df.rename(columns={"Channel/Daypart": "Channel"}, inplace=True)
+                        df[['Influencer Say','Color Code','Data Through']] = ''
+                        column_order = [
+                            "Organisation", "Business Unit", "Category", "Sub category", "Brand", "Total Brand",
+                            "Model", "Media Type", "Product Line", "Master Channel", "Channel/Daypart", "Platform", 
+                            "Influencer Say", "Color Code", "Audience", "Daypart", "Year", "Month", "Data Through", 
+                            "Cost", "Normalized Cost", "Impression", "Normalized Impression", 
+                            "Offline Dollar Sales", "Offline Volume", "Offline ROI", 
+                            "Online Dollar Sales", "Online Volume", "Online ROI", 
+                            "Overall Dollar Sales", "Overall Volume", "Overall ROI"
+                        ]
+                        df = df[column_order]
+                        
+                        last_year = df['Year'].iloc[-1]
+                        last_month = df['Month'].iloc[-1]
+                        df['Data Through'] = pd.to_datetime(f"{last_year}-{last_month}-01") + pd.offsets.MonthEnd(0)
+                        df['Data Through'] = df['Data Through'].dt.strftime('%b\'%y')
+                                                # Display the processed DataFrame
+                        st.write(f"Processed DataFrame for: {PW_DMC_Data_Preparation_df.name}")
+                        st.dataframe(df)
+
+                        @st.cache_data
+                        def convert_df_to_csv(dataframe):
+                            return dataframe.to_csv(index=False).encode('utf-8')
+
+                        csv_data = convert_df_to_csv(df)
+
+                        st.download_button(
+                            label="PW DMC Download Playground Processed CSV",
+                            data=csv_data,
+                            file_name="PW_DMC Playground_Processed_Data.csv",
+                            mime='text/csv'
+                        )
+                    except Exception as e:
+                        st.error(f"Error processing {PW_DMC_Data_Preparation_df.name}: {e}")
+
+        if selected == "PC DEO DMC":
+            st.subheader("PC DEO DMC")
+            Deo_DMC_PG_Data_Preparation = st.file_uploader("Upload your DEO DMC RROI file", type=["xlsx"], accept_multiple_files=True)
+            if Deo_DMC_PG_Data_Preparation:
+                for Deo_DMC_Data_Preparation_df in Deo_DMC_PG_Data_Preparation:
+                    try:
+                        df = pd.read_excel(Deo_DMC_Data_Preparation_df)
+
+                        #DEO Axe Playground Preparation
+                        if 'Feature ID' in df.columns:
+                            df = df.drop(columns=['Feature ID','Model Scope','Input Brand','Input Category','Upload Date','Modified Date','Model Scope Alias','Year-Month'])
+                        
+                        if "DEO_DMC" in Deo_DMC_Data_Preparation_df.name:
+                            df["Organisation"] = "Unilever"
+                            df["Business Unit"] = "Personal Care"
+                            df["Category"] = "Deodorant"
+                            df["Sub category"] = "DEO DMC"
+                            df["Brand"] = "PC DEO DMC"
+                            df["Total Brand"] = "PC DEO DMC"
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel/Daypart' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Earned Media"
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = df.loc[Earned_Media_filter, 'Product Line']
+                                df.loc[Earned_Media_filter, 'Product Line'] = None  
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel/Daypart' in df.columns:
+                                Non_Media_filter = df['Media Type'] == "Non Media"
+                                df.loc[Non_Media_filter, 'Channel/Daypart'] = df.loc[Non_Media_filter, 'Product Line']
+                                df.loc[Non_Media_filter, 'Product Line'] = None 
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                Owned_Media_filter = df['Media Type'] == "Owned Media"
+                                df.loc[Owned_Media_filter, 'Platform'] = df.loc[Owned_Media_filter, 'Product Line']
+                                df.loc[Owned_Media_filter, 'Product Line'] = None
+
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                df['Platform'] = df['Platform'].replace('Facebook', 'Facebook page Post')
+                                df['Platform'] = df['Platform'].replace('Instagram', 'Instagram page Post')
+                                df['Platform'] = df['Platform'].replace('Twitter', 'Twitter page Post')                                         
+                                df['Platform'] = df['Platform'].replace('Web Traffic', 'Web_Analytics')
+                                df['Master Channel'] = df['Master Channel'].replace('Baseline', ' ')
+                                df['Master Channel'] = df['Master Channel'].replace('Recipients', ' ')
+                                df['Master Channel'] = df['Master Channel'].replace('Sessions', ' ')
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                df['Media Type'] = df['Media Type'].replace('Shopper', 'Coupon')
+                                coupon_Shopper_filter = df['Media Type'] == "Coupon"
+                                df.loc[coupon_Shopper_filter, 'Platform'] = df.loc[coupon_Shopper_filter, 'Product Line']
+                                df.loc[coupon_Shopper_filter, 'Product Line'] = None
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Media Type'] == "Trade Promo"
+                                df.loc[trade_promo_filter, 'Channel/Daypart'] = (
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+                                df.loc[trade_promo_filter, 'Master Channel'] = None
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Master Channel'] == "Earned Media"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Master Channel'] = None 
+                                df.loc[trade_promo_filter, 'Product Line'] = None   
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Master Channel'] == "Paid Media"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Master Channel'] = None 
+                                df.loc[trade_promo_filter, 'Product Line'] = None 
+
+                            if 'Media Type' in df.columns:
+                                trade_promo_filter = df['Media Type'] == "Masterbrand"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None 
+
+                            if 'Media Type' in df.columns:
+                                trade_promo_filter = df['Media Type'] == "Halo"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None 
+
+
+                            if 'Master Channel' in df.columns and 'Daypart' not in df.columns:
+                                df['Daypart'] = None
+                            if 'Master Channel' in df.columns:
+                                Master_Channel_TV_filter = df['Master Channel'] == "TV"
+                                df.loc[Master_Channel_TV_filter, 'Daypart'] = df.loc[Master_Channel_TV_filter, 'Channel/Daypart']
+                                df.loc[Master_Channel_TV_filter, 'Channel/Daypart'] = "TV" 
+
+                            if 'Channel/Daypart' in df.columns:
+                                Product_line_TV_filter = df['Channel/Daypart'] == "Trends"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Category'), 'Channel/Daypart'] = "Trends Category"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Master Channel'] == "PR")
+                                df.loc[Product_line_TV_filter, 'Channel/Daypart'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None 
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Master Channel'] == "Influencer")
+                                df.loc[Product_line_TV_filter, 'Channel/Daypart'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None 
+
+                            if 'Channel/Daypart' in df.columns:
+                                Product_line_TV_filter = df['Channel/Daypart'] == "Seasonality"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Monthly'), 'Channel/Daypart'] = "Seasonality Monthly"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Master Channel'] == "Coupon"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Master Channel'] = None
+                        
+
+                        df['Normalized Cost'] = (df['Cost'])
+                        df['Normalized Impression'] = (df['Impression'])
+                        df['Daypart'] = df['Daypart'].replace('TV', '')
+                        df['Platform'] = df['Platform'].replace("NonDigital", "Non-Digital")
+                        #df.rename(columns={"Channel/Daypart": "Channel"}, inplace=True)
+                        df[['Influencer Say','Color Code','Data Through']] = ''
+                        column_order = [
+                            "Organisation", "Business Unit", "Category", "Sub category", "Brand", "Total Brand",
+                            "Model", "Media Type", "Product Line", "Master Channel", "Channel/Daypart", "Platform", 
+                            "Influencer Say", "Color Code", "Audience", "Daypart", "Year", "Month", "Data Through", 
+                            "Cost", "Normalized Cost", "Impression", "Normalized Impression", 
+                            "Offline Dollar Sales", "Offline Volume", "Offline ROI", 
+                            "Online Dollar Sales", "Online Volume", "Online ROI", 
+                            "Overall Dollar Sales", "Overall Volume", "Overall ROI"
+                        ]
+                        df = df[column_order]
+                        last_year = df['Year'].iloc[-1]
+                        last_month = df['Month'].iloc[-1]
+                        df['Data Through'] = pd.to_datetime(f"{last_year}-{last_month}-01") + pd.offsets.MonthEnd(0)
+                        df['Data Through'] = df['Data Through'].dt.strftime('%b\'%y')
+                                                # Display the processed DataFrame
+                        st.write(f"Processed DataFrame for: {Deo_DMC_Data_Preparation_df.name}")
+                        st.dataframe(df)
+
+                        @st.cache_data
+                        def convert_df_to_csv(dataframe):
+                            return dataframe.to_csv(index=False).encode('utf-8')
+
+                        csv_data = convert_df_to_csv(df)
+
+                        st.download_button(
+                            label="DEO DMC Download Playground Processed CSV",
+                            data=csv_data,
+                            file_name="DEO_DMC Playground_Processed_Data.csv",
+                            mime='text/csv'
+                        )
+                    except Exception as e:
+                        st.error(f"Error processing {Deo_DMC_Data_Preparation_df.name}: {e}")
+
+        if selected == "PC DEO DOVE":
+            st.subheader("PC DEO DOVE")
+            Deo_DOVE_PG_Data_Preparation = st.file_uploader("Upload your DEO DOVE RROI file", type=["xlsx"], accept_multiple_files=True)
+            if Deo_DOVE_PG_Data_Preparation:
+                for Deo_DOVE_Data_Preparation_df in Deo_DOVE_PG_Data_Preparation:
+                    try:
+                        df = pd.read_excel(Deo_DOVE_Data_Preparation_df)
+
+                        #DEO DOVE Playground Preparation
+                        if 'Feature ID' in df.columns:
+                            df = df.drop(columns=['Feature ID','Model Scope','Input Brand','Input Category','Upload Date','Modified Date','Model Scope Alias','Year-Month'])
+                        
+                        if "DEO_Dove" in Deo_DOVE_Data_Preparation_df.name:
+                            df["Organisation"] = "Unilever"
+                            df["Business Unit"] = "Personal Care"
+                            df["Category"] = "Deodorant"
+                            df["Sub category"] = "DEO DOVE"
+                            df["Brand"] = "PC DEO DOVE"
+                            df["Total Brand"] = "PC DEO DOVE"
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Earned Media"
+                                df.loc[Earned_Media_filter, 'Channel'] = df.loc[Earned_Media_filter, 'Product Line']
+                                df.loc[Earned_Media_filter, 'Product Line'] = None  
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel' in df.columns:
+                                Non_Media_filter = df['Media Type'] == "Non Media"
+                                df.loc[Non_Media_filter, 'Channel'] = df.loc[Non_Media_filter, 'Product Line']
+                                df.loc[Non_Media_filter, 'Product Line'] = None 
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                Owned_Media_filter = df['Media Type'] == "Owned Media"
+                                df.loc[Owned_Media_filter, 'Platform'] = df.loc[Owned_Media_filter, 'Product Line']
+                                df.loc[Owned_Media_filter, 'Product Line'] = None
+
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                df['Platform'] = df['Platform'].replace('Facebook', 'Facebook page Post')
+                                df['Platform'] = df['Platform'].replace('Instagram', 'Instagram page Post')
+                                df['Platform'] = df['Platform'].replace('Twitter', 'Twitter page Post')                                         
+                                df['Platform'] = df['Platform'].replace('Web Traffic', 'Web_Analytics')
+                                df['Master Channel'] = df['Master Channel'].replace('Baseline', ' ')
+                                df['Master Channel'] = df['Master Channel'].replace('Recipients', ' ')
+                                df['Master Channel'] = df['Master Channel'].replace('Sessions', ' ')
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                df['Media Type'] = df['Media Type'].replace('Shopper', 'Coupon')
+                                coupon_Shopper_filter = df['Media Type'] == "Coupon"
+                                df.loc[coupon_Shopper_filter, 'Platform'] = df.loc[coupon_Shopper_filter, 'Product Line']
+                                df.loc[coupon_Shopper_filter, 'Product Line'] = None
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Media Type'] == "Trade Promo"
+                                df.loc[trade_promo_filter, 'Channel'] = (
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+                                df.loc[trade_promo_filter, 'Master Channel'] = None
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Haircare F"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None   
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "PW F"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None   
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Skincleansing"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None   
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Cinema"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Product Line'] 
+                                df.loc[trade_promo_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Print"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Product Line'] 
+                                df.loc[trade_promo_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "OOH"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Product Line'] 
+                                df.loc[trade_promo_filter, 'Product Line'] = None   
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "TV"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Product Line'] 
+                                df.loc[trade_promo_filter, 'Product Line'] = None 
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Commerce & Search"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Master Channel'] 
+                                df.loc[trade_promo_filter, 'Master Channel'] = "Commerce & Search"
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Digital"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Master Channel'] 
+                                df.loc[trade_promo_filter, 'Master Channel'] = "Commerce & Search"
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+
+                            if 'Channel' in df.columns:
+                                Product_line_TV_filter = df['Channel'] == "Trends"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Category'), 'Channel'] = "Trends Category"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Master Channel' in df.columns:
+                                Product_line_TV_filter = (df['Master Channel'] == "PR")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None 
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Product Line'] == "PR")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None 
+
+                            if 'Master Channel' in df.columns:
+                                Product_line_TV_filter = (df['Master Channel'] == "Influencer")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Product Line'] == "Influencer")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None      
+
+                            if 'Master Channel' in df.columns:
+                                Product_line_TV_filter = (df['Master Channel'] == "Influencer Retail")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Product Line'] == "Influencer Retail")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None 
+
+                            if 'Channel' in df.columns:
+                                Product_line_TV_filter = df['Channel'] == "Seasonality"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Monthly'), 'Channel'] = "Seasonality Monthly"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Master Channel' in df.columns and 'Media Type' in df.columns and 'Daypart' in df.columns:
+                                Product_line_TV_filter = (
+                                    (df['Master Channel'] == "TV") &
+                                    (df['Media Type'] == "Paid Media") &
+                                    (df['Channel'] != "TV")
+                                )
+                                df.loc[Product_line_TV_filter, 'Daypart'] = df.loc[Product_line_TV_filter, 'Channel']
+                                df.loc[Product_line_TV_filter, 'Channel'] = "TV"
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Dove"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Superbowl"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+
+                        df['Normalized Cost'] = (df['Cost'])
+                        df['Normalized Impression'] = (df['Impression'])
+                        df['Platform'] = df['Platform'].replace("NonDigital", "Non-Digital")
+                        #df.rename(columns={"Channel/Daypart": "Channel"}, inplace=True)
+                        df[['Influencer Say','Color Code','Data Through']] = ''
+                        column_order = [
+                            "Organisation", "Business Unit", "Category", "Sub category", "Brand", "Total Brand",
+                            "Model", "Media Type", "Product Line", "Master Channel", "Channel", "Platform", 
+                            "Influencer Say", "Color Code", "Audience", "Daypart", "Year", "Month", "Data Through", 
+                            "Cost", "Normalized Cost", "Impression", "Normalized Impression", 
+                            "Offline Dollar Sales", "Offline Volume", "Offline ROI", 
+                            "Online Dollar Sales", "Online Volume", "Online ROI", 
+                            "Overall Dollar Sales", "Overall Volume", "Overall ROI"
+                        ]
+                        df = df[column_order]
+                        df = df[df['Daypart'] != 'TV']
+                        last_year = df['Year'].iloc[-1]
+                        last_month = df['Month'].iloc[-1]
+                        df['Data Through'] = pd.to_datetime(f"{last_year}-{last_month}-01") + pd.offsets.MonthEnd(0)
+                        df['Data Through'] = df['Data Through'].dt.strftime('%b\'%y')
+                                                # Display the processed DataFrame
+                        st.write(f"Processed DataFrame for: {Deo_DOVE_Data_Preparation_df.name}")
+                        st.dataframe(df)
+
+                        @st.cache_data
+                        def convert_df_to_csv(dataframe):
+                            return dataframe.to_csv(index=False).encode('utf-8')
+
+                        csv_data = convert_df_to_csv(df)
+
+                        st.download_button(
+                            label="DEO DOVE Download Playground Processed CSV",
+                            data=csv_data,
+                            file_name="DEO_DOVE Playground_Processed_Data.csv",
+                            mime='text/csv'
+                        )
+                    except Exception as e:
+                        st.error(f"Error processing {Deo_DOVE_Data_Preparation_df.name}: {e}")
+
+        if selected == "PC PW DOVE BAR":
+            st.subheader("PC PW DOVE BAR")
+            PW_DOVE_BAR_PG_Data_Preparation = st.file_uploader("Upload your PW DOVE BAR RROI file", type=["xlsx"], accept_multiple_files=True)
+            if PW_DOVE_BAR_PG_Data_Preparation:
+                for PW_DOVE_BAR_Data_Preparation_df in PW_DOVE_BAR_PG_Data_Preparation:
+                    try:
+                        df = pd.read_excel(PW_DOVE_BAR_Data_Preparation_df)
+
+                        #PW_DOVE_BAR Playground Preparation
+                        if 'Feature ID' in df.columns:
+                            df = df.drop(columns=['Feature ID','Model Scope','Input Brand','Input Category','Upload Date','Modified Date','Model Scope Alias','Year-Month'])
+                        
+                        if "PW_DoveBAR" in PW_DOVE_BAR_Data_Preparation_df.name:
+                            df["Organisation"] = "Unilever"
+                            df["Business Unit"] = "Personal Care"
+                            df["Category"] = "Skin Cleansing"
+                            df["Sub category"] = "Bar"
+                            df["Brand"] = "PC Dove Bar"
+                            df["Total Brand"] = "PC PW Dove"
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Earned Media"
+                                df.loc[Earned_Media_filter, 'Channel'] = df.loc[Earned_Media_filter, 'Product Line']
+                                df.loc[Earned_Media_filter, 'Product Line'] = None  
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel' in df.columns:
+                                Non_Media_filter = df['Media Type'] == "Non Media"
+                                df.loc[Non_Media_filter, 'Channel'] = df.loc[Non_Media_filter, 'Product Line']
+                                df.loc[Non_Media_filter, 'Product Line'] = None 
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                Owned_Media_filter = df['Media Type'] == "Owned Media"
+                                df.loc[Owned_Media_filter, 'Platform'] = df.loc[Owned_Media_filter, 'Product Line']
+                                df.loc[Owned_Media_filter, 'Product Line'] = None
+
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                df['Platform'] = df['Platform'].replace('Facebook', 'Facebook page Post')
+                                df['Platform'] = df['Platform'].replace('Instagram', 'Instagram page Post')
+                                df['Platform'] = df['Platform'].replace('Twitter', 'Twitter page Post')                                         
+                                df['Platform'] = df['Platform'].replace('Web Traffic', 'Web_Analytics')
+                                df['Master Channel'] = df['Master Channel'].replace('Baseline', ' ')
+                                df['Master Channel'] = df['Master Channel'].replace('Recipients', ' ')
+                                df['Master Channel'] = df['Master Channel'].replace('Sessions', ' ')
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                df['Media Type'] = df['Media Type'].replace('Shopper', 'Coupon')
+                                coupon_Shopper_filter = df['Media Type'] == "Coupon"
+                                df.loc[coupon_Shopper_filter, 'Platform'] = df.loc[coupon_Shopper_filter, 'Product Line']
+                                df.loc[coupon_Shopper_filter, 'Product Line'] = None
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Media Type'] == "Trade Promo"
+                                df.loc[trade_promo_filter, 'Channel'] = (
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+                                df.loc[trade_promo_filter, 'Master Channel'] = None
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Haircare F"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None   
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Deo F"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None   
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Print"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Product Line'] 
+                                df.loc[trade_promo_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "OOH"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Product Line'] 
+                                df.loc[trade_promo_filter, 'Product Line'] = None   
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "TV"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Product Line'] 
+                                df.loc[trade_promo_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Commerce & Search"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Master Channel'] 
+                                df.loc[trade_promo_filter, 'Master Channel'] = "Commerce & Search"
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Digital"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Master Channel'] 
+                                df.loc[trade_promo_filter, 'Master Channel'] = "Commerce & Search"
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+
+                            if 'Master Channel' in df.columns and 'Product Line' in df.columns:
+                                Product_line_TV_filter = df['Product Line'] == "Trends"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Category'), 'Channel'] = "Trends Category"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None
+
+                            if 'Master Channel' in df.columns:
+                                Product_line_TV_filter = (df['Master Channel'] == "PR")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None 
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Product Line'] == "PR")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None 
+
+                            if 'Master Channel' in df.columns:
+                                Product_line_TV_filter = (df['Master Channel'] == "Influencer")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Product Line'] == "Influencer")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None      
+
+                            if 'Master Channel' in df.columns:
+                                Product_line_TV_filter = (df['Master Channel'] == "Influencer Retail")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Product Line'] == "Influencer Retail")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns and 'Master Channel' in df.columns and 'Channel' in df.columns:
+                                Product_line_TV_filter = df['Product Line'] == "Seasonality"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Monthly'), 'Channel'] = "Seasonality Monthly"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None
+
+                            if 'Master Channel' in df.columns and 'Media Type' in df.columns and 'Daypart' in df.columns:
+                                Product_line_TV_filter = (
+                                    (df['Master Channel'] == "TV") &
+                                    (df['Media Type'] == "Paid Media") &
+                                    (df['Channel'] != "TV")
+                                )
+                                df.loc[Product_line_TV_filter, 'Daypart'] = df.loc[Product_line_TV_filter, 'Channel']
+                                df.loc[Product_line_TV_filter, 'Channel'] = "TV"
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Dove"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Superbowl"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+
+                            if 'Channel' in df.columns:
+                                Product_line_TV_filter = df['Channel'] == "Seasonality"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Monthly'), 'Channel'] = "Seasonality Monthly"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Channel' in df.columns:
+                                Product_line_TV_filter = df['Channel'] == "Trends"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Category'), 'Channel'] = "Trends Category"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                        df['Normalized Cost'] = (df['Cost']/2)
+                        df['Normalized Impression'] = (df['Impression']/2)
+                        df['Platform'] = df['Platform'].replace("NonDigital", "Non-Digital")
+                        #df.rename(columns={"Channel/Daypart": "Channel"}, inplace=True)
+                        df[['Influencer Say','Color Code','Data Through']] = ''
+                        column_order = [
+                            "Organisation", "Business Unit", "Category", "Sub category", "Brand", "Total Brand",
+                            "Model", "Media Type", "Product Line", "Master Channel", "Channel", "Platform", 
+                            "Influencer Say", "Color Code", "Audience", "Daypart", "Year", "Month", "Data Through", 
+                            "Cost", "Normalized Cost", "Impression", "Normalized Impression", 
+                            "Offline Dollar Sales", "Offline Volume", "Offline ROI", 
+                            "Online Dollar Sales", "Online Volume", "Online ROI", 
+                            "Overall Dollar Sales", "Overall Volume", "Overall ROI"
+                        ]
+                        df = df[column_order]
+                        df = df[df['Daypart'] != 'TV']
+                        last_year = df['Year'].iloc[-1]
+                        last_month = df['Month'].iloc[-1]
+                        df['Data Through'] = pd.to_datetime(f"{last_year}-{last_month}-01") + pd.offsets.MonthEnd(0)
+                        df['Data Through'] = df['Data Through'].dt.strftime('%b\'%y')
+                                                # Display the processed DataFrame
+                        st.write(f"Processed DataFrame for: {PW_DOVE_BAR_Data_Preparation_df.name}")
+                        st.dataframe(df)
+
+                        @st.cache_data
+                        def convert_df_to_csv(dataframe):
+                            return dataframe.to_csv(index=False).encode('utf-8')
+
+                        csv_data = convert_df_to_csv(df)
+
+                        st.download_button(
+                            label="PW DOVE BAR Download Playground Processed CSV",
+                            data=csv_data,
+                            file_name="PW_DOVE_BAR Playground_Processed_Data.csv",
+                            mime='text/csv'
+                        )
+                    except Exception as e:
+                        st.error(f"Error processing {PW_DOVE_BAR_Data_Preparation_df.name}: {e}")
+
+        if selected == "PC PW DOVE BW":
+            st.subheader("PC PW DOVE BW")
+            PW_DOVE_BW_PG_Data_Preparation = st.file_uploader("Upload your PW DOVE BW RROI file", type=["xlsx"], accept_multiple_files=True)
+            if PW_DOVE_BW_PG_Data_Preparation:
+                for PW_DOVE_BW_Data_Preparation_df in PW_DOVE_BW_PG_Data_Preparation:
+                    try:
+                        df = pd.read_excel(PW_DOVE_BW_Data_Preparation_df)
+
+                        #PW_DOVE_BW Playground Preparation
+                        if 'Feature ID' in df.columns:
+                            df = df.drop(columns=['Feature ID','Model Scope','Input Brand','Input Category','Upload Date','Modified Date','Model Scope Alias','Year-Month'])
+                        
+                        if "PW_DoveBW" in PW_DOVE_BW_Data_Preparation_df.name:
+                            df["Organisation"] = "Unilever"
+                            df["Business Unit"] = "Personal Care"
+                            df["Category"] = "Skin Cleansing"
+                            df["Sub category"] = "BW"
+                            df["Brand"] = "PC Dove BW"
+                            df["Total Brand"] = "PC PW Dove"
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Earned Media"
+                                df.loc[Earned_Media_filter, 'Channel'] = df.loc[Earned_Media_filter, 'Product Line']
+                                df.loc[Earned_Media_filter, 'Product Line'] = None  
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel' in df.columns:
+                                Non_Media_filter = df['Media Type'] == "Non Media"
+                                df.loc[Non_Media_filter, 'Channel'] = df.loc[Non_Media_filter, 'Product Line']
+                                df.loc[Non_Media_filter, 'Product Line'] = None 
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                Owned_Media_filter = df['Media Type'] == "Owned Media"
+                                df.loc[Owned_Media_filter, 'Platform'] = df.loc[Owned_Media_filter, 'Product Line']
+                                df.loc[Owned_Media_filter, 'Product Line'] = None
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                df['Platform'] = df['Platform'].replace('Facebook', 'Facebook page Post')
+                                df['Platform'] = df['Platform'].replace('Instagram', 'Instagram page Post')
+                                df['Platform'] = df['Platform'].replace('Twitter', 'Twitter page Post')                                         
+                                df['Platform'] = df['Platform'].replace('Web Traffic', 'Web_Analytics')
+                                df['Master Channel'] = df['Master Channel'].replace('Baseline', ' ')
+                                df['Master Channel'] = df['Master Channel'].replace('Recipients', ' ')
+                                df['Master Channel'] = df['Master Channel'].replace('Sessions', ' ')
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                df['Media Type'] = df['Media Type'].replace('Shopper', 'Coupon')
+                                coupon_Shopper_filter = df['Media Type'] == "Coupon"
+                                df.loc[coupon_Shopper_filter, 'Platform'] = df.loc[coupon_Shopper_filter, 'Product Line']
+                                df.loc[coupon_Shopper_filter, 'Product Line'] = None
+
+                            if 'Master Channel' in df.columns:
+                                trade_promo_filter = df['Media Type'] == "Trade Promo"
+                                df.loc[trade_promo_filter, 'Channel'] = (
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Master Channel'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+                                df.loc[trade_promo_filter, 'Master Channel'] = None
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Haircare F"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None   
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Deo F"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None  
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Deo"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None   
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Haircare"
+                                df.loc[trade_promo_filter, 'Media Type'] = (
+                                    df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                    df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                df.loc[trade_promo_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Print"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Product Line'] 
+                                df.loc[trade_promo_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "OOH"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Product Line'] 
+                                df.loc[trade_promo_filter, 'Product Line'] = None   
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "TV"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Product Line'] 
+                                df.loc[trade_promo_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Commerce & Search"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Master Channel'] 
+                                df.loc[trade_promo_filter, 'Master Channel'] = "Commerce & Search"
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+
+                            if 'Product Line' in df.columns:
+                                trade_promo_filter = df['Product Line'] == "Digital"
+                                df.loc[trade_promo_filter, 'Channel'] = df.loc[trade_promo_filter, 'Master Channel'] 
+                                df.loc[trade_promo_filter, 'Master Channel'] = "Commerce & Search"
+                                df.loc[trade_promo_filter, 'Product Line'] = None
+
+                            if 'Master Channel' in df.columns and 'Product Line' in df.columns:
+                                Product_line_TV_filter = df['Product Line'] == "Trends"
+                                df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Category'), 'Channel'] = "Trends Category"
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None
+
+                            if 'Master Channel' in df.columns:
+                                Product_line_TV_filter = (df['Master Channel'] == "PR")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None 
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Product Line'] == "PR")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None 
+
+                            if 'Master Channel' in df.columns:
+                                Product_line_TV_filter = (df['Master Channel'] == "Influencer")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Product Line'] == "Influencer")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None      
+
+                            if 'Master Channel' in df.columns:
+                                Product_line_TV_filter = (df['Master Channel'] == "Influencer Retail")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Master Channel']
+                                df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Product Line' in df.columns:
+                                Product_line_TV_filter = (df['Product Line'] == "Influencer Retail")
+                                df.loc[Product_line_TV_filter, 'Channel'] = df.loc[Product_line_TV_filter, 'Product Line']
+                                df.loc[Product_line_TV_filter, 'Product Line'] = None 
+
+                            if 'Product Line' in df.columns and 'Master Channel' in df.columns and 'Channel' in df.columns:
+                                    Product_line_TV_filter = df['Product Line'] == "Seasonality"
+                                    df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Monthly'), 'Channel'] = "Seasonality Monthly"
+                                    df.loc[Product_line_TV_filter, 'Master Channel'] = None
+                                    df.loc[Product_line_TV_filter, 'Product Line'] = None
+
+                            if 'Master Channel' in df.columns and 'Media Type' in df.columns and 'Daypart' in df.columns:
+                                    Product_line_TV_filter = (
+                                        (df['Master Channel'] == "TV") &
+                                        (df['Media Type'] == "Paid Media") &
+                                        (df['Channel'] != "TV")
+                                    )
+                                    df.loc[Product_line_TV_filter, 'Daypart'] = df.loc[Product_line_TV_filter, 'Channel']
+                                    df.loc[Product_line_TV_filter, 'Channel'] = "TV"
+
+                            if 'Product Line' in df.columns:
+                                    trade_promo_filter = df['Product Line'] == "Dove"
+                                    df.loc[trade_promo_filter, 'Media Type'] = (
+                                        df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                        df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                    df.loc[trade_promo_filter, 'Product Line'] = None
+
+                            if 'Product Line' in df.columns:
+                                    trade_promo_filter = df['Product Line'] == "Superbowl"
+                                    df.loc[trade_promo_filter, 'Media Type'] = (
+                                        df.loc[trade_promo_filter, 'Media Type'].astype(str) + "_" + 
+                                        df.loc[trade_promo_filter, 'Product Line'].astype(str))
+                                    df.loc[trade_promo_filter, 'Product Line'] = None
+
+                            if 'Channel' in df.columns:
+                                    Product_line_TV_filter = df['Channel'] == "Seasonality"
+                                    df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Monthly'), 'Channel'] = "Seasonality Monthly"
+                                    df.loc[Product_line_TV_filter, 'Master Channel'] = None
+
+                            if 'Channel' in df.columns:
+                                    Product_line_TV_filter = df['Channel'] == "Trends"
+                                    df.loc[Product_line_TV_filter & (df['Master Channel'] == 'Category'), 'Channel'] = "Trends Category"
+                                    df.loc[Product_line_TV_filter, 'Master Channel'] = None    
+                        
+                        # Convert 'Cost' and 'Impression' columns to numeric, replacing non-numeric values with NaN
+                        df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce')
+                        df['Impression'] = pd.to_numeric(df['Impression'], errors='coerce')
+                        
+                        # Handle missing values if necessary (e.g., replace NaN with 0)
+                        df['Cost'] = df['Cost'].fillna(0)
+                        df['Impression'] = df['Impression'].fillna(0)
+
+                        # Perform the division to calculate normalized values
+                        df['Normalized Cost'] = df['Cost'] / 2
+                        df['Normalized Impression'] = df['Impression'] / 2
+                        df['Platform'] = df['Platform'].replace("NonDigital", "Non-Digital")
+                        #df.rename(columns={"Channel/Daypart": "Channel"}, inplace=True)
+                        df[['Influencer Say','Color Code','Data Through']] = ''
+                        column_order = [
+                            "Organisation", "Business Unit", "Category", "Sub category", "Brand", "Total Brand",
+                            "Model", "Media Type", "Product Line", "Master Channel", "Channel", "Platform", 
+                            "Influencer Say", "Color Code", "Audience", "Daypart", "Year", "Month", "Data Through", 
+                            "Cost", "Normalized Cost", "Impression", "Normalized Impression", 
+                            "Offline Dollar Sales", "Offline Volume", "Offline ROI", 
+                            "Online Dollar Sales", "Online Volume", "Online ROI", 
+                            "Overall Dollar Sales", "Overall Volume", "Overall ROI"
+                        ]
+                        df = df[column_order]
+                        df = df[df['Daypart'] != 'TV']
+                        last_year = df['Year'].iloc[-1]
+                        last_month = df['Month'].iloc[-1]
+                        df['Data Through'] = pd.to_datetime(f"{last_year}-{last_month}-01") + pd.offsets.MonthEnd(0)
+                        df['Data Through'] = df['Data Through'].dt.strftime('%b\'%y')
+                                                # Display the processed DataFrame
+                        st.write(f"Processed DataFrame for: {PW_DOVE_BW_Data_Preparation_df.name}")
+                        st.dataframe(df)
+
+                        @st.cache_data
+                        def convert_df_to_csv(dataframe):
+                            return dataframe.to_csv(index=False).encode('utf-8')
+                        csv_data = convert_df_to_csv(df)
+                        st.download_button(
+                            label="PW DOVE BW Download Playground Processed CSV",
+                            data=csv_data,
+                            file_name="PW_DOVE_BW_Playground_Processed_Data.csv",
+                            mime='text/csv'
+                        )
+                    except Exception as e:
+                        st.error(f"Error processing {PW_DOVE_BAR_Data_Preparation_df.name}: {e}")
+
         
-            def display_unique_and_difference(column_name):
-                present_values = Dimensions_Check_df.loc[Dimensions_Check_df[column_name].isin(Dimensions_RROI_df[column_name]), column_name].unique()
-                st.write(f"Unique list of {column_name} present in both DataFrames:", present_values)
-        
-                rroi_not_in_check = Dimensions_RROI_df[~Dimensions_RROI_df[column_name].isin(Dimensions_Check_df[column_name])][column_name].unique()
-                unique_list = ', '.join(map(str, rroi_not_in_check))
-                # Adding color using HTML
-                st.markdown(f"<p style='color:blue;'>Unique list of {column_name} in Playground_Check_list but not in Formatted_Playground_File:</p>", unsafe_allow_html=True)
-                st.markdown(f"<p style='color:Red;'>{unique_list}</p>", unsafe_allow_html=True)
+        if selected == "BnW HAIR Shea Moisture":
+            st.subheader("BnW HAIR Shea Moisture    ")
+            BnW_HAIR_Shea_Moisture_PG_Data_Preparation = st.file_uploader("Upload your BnW HAIR Shea Moisture' RROI file", type=["xlsx"], accept_multiple_files=True)
+            if BnW_HAIR_Shea_Moisture_PG_Data_Preparation:
+                for BnW_HAIR_Shea_Moisture_PG_Data_Preparation_df in BnW_HAIR_Shea_Moisture_PG_Data_Preparation:
+                    try:
+                        df = pd.read_excel(BnW_HAIR_Shea_Moisture_PG_Data_Preparation_df)
 
-            display_unique_and_difference('Organisation')
-            display_unique_and_difference('Business Unit')
-            display_unique_and_difference('Category')
-            display_unique_and_difference('Sub category')
-            display_unique_and_difference('Brand')
-            display_unique_and_difference('Total Brand')
-            display_unique_and_difference('Media Type')
-            display_unique_and_difference('Product Line')
-            display_unique_and_difference('Master Channel')
-            display_unique_and_difference('Channel')
-            display_unique_and_difference('Platform')
-            display_unique_and_difference('Influencer Say')
-            display_unique_and_difference('Color Code')
-            display_unique_and_difference('Audience')
-            display_unique_and_difference('Daypart')
-            
-    if selected == "Metrics Check":
-        st.subheader("Metrics Check")
-        Metrics_RROI = st.file_uploader("Upload your Combine RROI file", type=["csv"], accept_multiple_files=True)
+                        #PW_DOVE_BW Playground Preparation
+                        if 'Feature ID' in df.columns:
+                            df = df.drop(columns=['Feature ID','Model Scope','Input Brand','Input Category','Modified Date','Model Scope Alias'])
+                        
+                        if "HAIR_SheaMoisture" in BnW_HAIR_Shea_Moisture_PG_Data_Preparation_df.name:
+                            df["Organisation"] = "Unilever"
+                            df["Business Unit"] = "Beauty and Wellbeing"
+                            df["Category"] = "Haircare"
+                            df["Sub category"] = "Haircare"
+                            df["Brand"] = "BnW HAIR Shea Moisture"
+                            df["Total Brand"] = "BnW HAIR Shea Moisture"
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Earned Media"
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None  
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns and 'Product Line' in df.columns and 'Channel/Daypart' in df.columns and 'Audience' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Baseline"
+                                df.loc[Earned_Media_filter, 'Product Line'] = None 
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None 
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = None
+                                df.loc[Earned_Media_filter, 'Platform'] = None
+                                df.loc[Earned_Media_filter, 'Audience'] = None
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Coupon"
+                                df.loc[Earned_Media_filter, 'Platform'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None 
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Non Media"
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None    
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Owned Media"
+                                df.loc[Earned_Media_filter, 'Platform'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                df['Media Type'] = df['Media Type'].replace('Promo', 'Trade Promo')
+                                coupon_Shopper_filter = df['Media Type'] == "Trade Promo"
+                                df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = df.loc[coupon_Shopper_filter, 'Master Channel']
+                                df.loc[coupon_Shopper_filter, 'Master Channel'] = None
+
+                        # Convert 'Cost' and 'Impression' columns to numeric, replacing non-numeric values with NaN
+                        df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce')
+                        df['Impression'] = pd.to_numeric(df['Impression'], errors='coerce')
+                        
+                        # Handle missing values if necessary (e.g., replace NaN with 0)
+                        df['Cost'] = df['Cost'].fillna(0)
+                        df['Impression'] = df['Impression'].fillna(0)
+
+                        # Perform the division to calculate normalized values
+                        df['Normalized Cost'] = df['Cost']
+                        df['Normalized Impression'] = df['Impression']
+                        df['Platform'] = df['Platform'].replace("NonDigital", "Non-Digital")
+                        df['Platform'] = df['Platform'].replace("Prism", "Shopper")
+                        df['Channel/Daypart'] = df['Channel/Daypart'].replace("Percentage Promo", "Percentage Sales")
+                        #df.rename(columns={"Channel/Daypart": "Channel"}, inplace=True)
+                        df[['Data Through','Daypart']] = ''
+                        column_order = [
+                            "Organisation", "Business Unit", "Category", "Sub category", "Brand", "Total Brand",
+                            "Model", "Media Type", "Product Line", "Master Channel", "Channel/Daypart", "Platform", 
+                            "Influencer Say", "Color Code", "Audience","Daypart", "Year", "Month", "Data Through", 
+                            "Cost", "Normalized Cost", "Impression", "Normalized Impression", 
+                            "Offline Dollar Sales", "Offline Volume", "Offline ROI", 
+                            "Online Dollar Sales", "Online Volume", "Online ROI", 
+                            "Overall Dollar Sales", "Overall Volume", "Overall ROI"
+                        ]
+                        df = df[column_order]
+                        last_year = df['Year'].iloc[-1]
+                        last_month = df['Month'].iloc[-1]
+                        df['Data Through'] = pd.to_datetime(f"{last_year}-{last_month}-01") + pd.offsets.MonthEnd(0)
+                        df['Data Through'] = df['Data Through'].dt.strftime('%b\'%y')
+                        st.write(f"Processed DataFrame for: {BnW_HAIR_Shea_Moisture_PG_Data_Preparation_df.name}")
+                        st.dataframe(df)
+
+                        @st.cache_data
+                        def convert_df_to_csv(dataframe):
+                            return dataframe.to_csv(index=False).encode('utf-8')
+                        csv_data = convert_df_to_csv(df)
+                        st.download_button(
+                            label="BnW HAIR Shea Moisture Download Playground Processed CSV",
+                            data=csv_data,
+                            file_name="BnW_HAIR_Shea_Moisture_Processed_Data.csv",
+                            mime='text/csv'
+                        )
+
+                    except Exception as e:
+                        st.error(f"Error processing {BnW_HAIR_Shea_Moisture_PG_Data_Preparation_df.name}: {e}")
+        if selected == "BnW HAIR Tresemme":
+            st.subheader("BnW HAIR Tresemme")
+            BnW_HAIR_Tresemme_PG_Data_Preparation = st.file_uploader("Upload your BnW HAIR Tresemme RROI file", type=["xlsx"], accept_multiple_files=True)
+            if BnW_HAIR_Tresemme_PG_Data_Preparation:
+                for BnW_HAIR_Tresemme_PG_Data_Preparation_df in BnW_HAIR_Tresemme_PG_Data_Preparation:
+                    try:
+                        df = pd.read_excel(BnW_HAIR_Tresemme_PG_Data_Preparation_df)
+
+                        #PW_DOVE_BW Playground Preparation
+                        if 'Feature ID' in df.columns:
+                            df = df.drop(columns=['Feature ID','Model Scope','Input Brand','Input Category','Modified Date','Model Scope Alias'])
+                        
+                        if "HAIR_Tresemme" in BnW_HAIR_Tresemme_PG_Data_Preparation_df.name:
+                            df["Organisation"] = "Unilever"
+                            df["Business Unit"] = "Beauty and Wellbeing"
+                            df["Category"] = "Haircare"
+                            df["Sub category"] = "Haircare"
+                            df["Brand"] = "BnW HAIR Tresemme"
+                            df["Total Brand"] = "BnW HAIR Tresemme"
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Earned Media"
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None  
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns and 'Product Line' in df.columns and 'Channel/Daypart' in df.columns and 'Audience' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Baseline"
+                                df.loc[Earned_Media_filter, 'Product Line'] = None 
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None 
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = None
+                                df.loc[Earned_Media_filter, 'Platform'] = None
+                                df.loc[Earned_Media_filter, 'Audience'] = None
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Coupon"
+                                df.loc[Earned_Media_filter, 'Platform'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None 
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Non Media"
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None    
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Owned Media"
+                                df.loc[Earned_Media_filter, 'Platform'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                df['Media Type'] = df['Media Type'].replace('Promo', 'Trade Promo')
+                                coupon_Shopper_filter = df['Media Type'] == "Trade Promo"
+                                df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = df.loc[coupon_Shopper_filter, 'Master Channel']
+                                df.loc[coupon_Shopper_filter, 'Master Channel'] = None
+                            df[['Data Through','Daypart']] = ''
+                            if 'Master Channel' in df.columns and 'Daypart' in df.columns and 'Channel/Daypart' in df.columns:
+                                coupon_Shopper_filter = df['Master Channel'] == "TV"
+                                df.loc[coupon_Shopper_filter, 'Daypart'] = df.loc[coupon_Shopper_filter, 'Channel/Daypart']
+                                df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = None    
+
+                        # Convert 'Cost' and 'Impression' columns to numeric, replacing non-numeric values with NaN
+                        df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce')
+                        df['Impression'] = pd.to_numeric(df['Impression'], errors='coerce')
+                        
+                        # Handle missing values if necessary (e.g., replace NaN with 0)
+                        df['Cost'] = df['Cost'].fillna(0)
+                        df['Impression'] = df['Impression'].fillna(0)
+
+                        # Perform the division to calculate normalized values
+                        df['Normalized Cost'] = df['Cost']
+                        df['Normalized Impression'] = df['Impression']
+                        df['Platform'] = df['Platform'].replace("NonDigital", "Non-Digital")
+                        df['Platform'] = df['Platform'].replace("Prism", "Shopper")
+                        df['Channel/Daypart'] = df['Channel/Daypart'].replace("Percentage Promo", "Percentage Sales")
+                        #df.rename(columns={"Channel/Daypart": "Channel"}, inplace=True)
+                        # df[['Data Through','Daypart']] = ''
+                        column_order = [
+                            "Organisation", "Business Unit", "Category", "Sub category", "Brand", "Total Brand",
+                            "Model", "Media Type", "Product Line", "Master Channel", "Channel/Daypart", "Platform", 
+                            "Influencer Say", "Color Code", "Audience","Daypart", "Year", "Month", "Data Through", 
+                            "Cost", "Normalized Cost", "Impression", "Normalized Impression", 
+                            "Offline Dollar Sales", "Offline Volume", "Offline ROI", 
+                            "Online Dollar Sales", "Online Volume", "Online ROI", 
+                            "Overall Dollar Sales", "Overall Volume", "Overall ROI"
+                        ]
+                        df = df[column_order]
+                        last_year = df['Year'].iloc[-1]
+                        last_month = df['Month'].iloc[-1]
+                        df['Data Through'] = pd.to_datetime(f"{last_year}-{last_month}-01") + pd.offsets.MonthEnd(0)
+                        df['Data Through'] = df['Data Through'].dt.strftime('%b\'%y')
+                        st.write(f"Processed DataFrame for: {BnW_HAIR_Tresemme_PG_Data_Preparation_df.name}")
+                        st.dataframe(df)
+
+                        @st.cache_data
+                        def convert_df_to_csv(dataframe):
+                            return dataframe.to_csv(index=False).encode('utf-8')
+                        csv_data = convert_df_to_csv(df)
+                        st.download_button(
+                            label="BnW HAIR Tresemme Download Playground Processed CSV",
+                            data=csv_data,
+                            file_name="BnW_HAIR_Tresemme_Processed_Data.csv",
+                            mime='text/csv'
+                        )
+
+                    except Exception as e:
+                        st.error(f"Error processing {BnW_HAIR_Tresemme_PG_Data_Preparation_df.name}: {e}")
+        
+        if selected == "BnW SKIN Vaseline":
+            st.subheader("BnW SKIN Vaseline")
+            BnW_SKIN_Vaseline_PG_Data_Preparation = st.file_uploader("Upload your BnW SKIN_Vaseline RROI file", type=["xlsx"], accept_multiple_files=True)
+            if BnW_SKIN_Vaseline_PG_Data_Preparation:
+                for BnW_SKIN_Vaseline_PG_Data_Preparation_df in BnW_SKIN_Vaseline_PG_Data_Preparation:
+                    try:
+                        df = pd.read_excel(BnW_SKIN_Vaseline_PG_Data_Preparation_df)
+
+                        #PW_DOVE_BW Playground Preparation
+                        if 'Feature ID' in df.columns:
+                            df = df.drop(columns=['Feature ID','Model Scope','Input Brand','Input Category','Modified Date','Model Scope Alias'])
+                        
+                        if "SKIN_Vaseline" in BnW_SKIN_Vaseline_PG_Data_Preparation_df.name:
+                            df["Organisation"] = "Unilever"
+                            df["Business Unit"] = "Beauty and Wellbeing"
+                            df["Category"] = "Skincare"
+                            df["Sub category"] = "Skincare"
+                            df["Brand"] = "BnW SKIN Vaseline"
+                            df["Total Brand"] = "BnW SKIN Vaseline"
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Earned Media"
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None  
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns and 'Product Line' in df.columns and 'Channel/Daypart' in df.columns and 'Audience' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Baseline"
+                                df.loc[Earned_Media_filter, 'Product Line'] = None 
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None 
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = None
+                                df.loc[Earned_Media_filter, 'Platform'] = None
+                                df.loc[Earned_Media_filter, 'Audience'] = None
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Coupon"
+                                df.loc[Earned_Media_filter, 'Platform'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None 
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Non Media"
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None    
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Owned Media"
+                                df.loc[Earned_Media_filter, 'Platform'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                df['Media Type'] = df['Media Type'].replace('Promo', 'Trade Promo')
+                                coupon_Shopper_filter = df['Media Type'] == "Trade Promo"
+                                df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = df.loc[coupon_Shopper_filter, 'Master Channel']
+                                df.loc[coupon_Shopper_filter, 'Master Channel'] = None
+
+                            df[['Data Through','Daypart']] = ''
+                            if 'Master Channel' in df.columns and 'Daypart' in df.columns and 'Channel/Daypart' in df.columns:
+                                coupon_Shopper_filter = df['Master Channel'] == "TV"
+                                df.loc[coupon_Shopper_filter, 'Daypart'] = df.loc[coupon_Shopper_filter, 'Channel/Daypart']
+                                df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = None  
+
+                            if 'Master Channel' in df.columns and 'Channel/Daypart' in df.columns:
+                                coupon_Shopper_filter = df['Media Type'] == "Temperature"
+                                df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = df.loc[coupon_Shopper_filter, 'Media Type']
+                                df.loc[coupon_Shopper_filter, 'Media Type'] = "Non Media"       
+
+
+                        # Convert 'Cost' and 'Impression' columns to numeric, replacing non-numeric values with NaN
+                        df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce')
+                        df['Impression'] = pd.to_numeric(df['Impression'], errors='coerce')
+                        
+                        # Handle missing values if necessary (e.g., replace NaN with 0)
+                        df['Cost'] = df['Cost'].fillna(0)
+                        df['Impression'] = df['Impression'].fillna(0)
+
+                        # Perform the division to calculate normalized values
+                        df['Normalized Cost'] = df['Cost']
+                        df['Normalized Impression'] = df['Impression']
+                        df['Platform'] = df['Platform'].replace("NonDigital", "Non-Digital")
+                        df['Platform'] = df['Platform'].replace("Prism", "Shopper")
+                        df['Channel/Daypart'] = df['Channel/Daypart'].replace("Percentage Promo", "Percentage Sales")
+                        #df.rename(columns={"Channel/Daypart": "Channel"}, inplace=True)
+                        # df[['Data Through','Daypart']] = ''
+                        column_order = [
+                            "Organisation", "Business Unit", "Category", "Sub category", "Brand", "Total Brand",
+                            "Model", "Media Type", "Product Line", "Master Channel", "Channel/Daypart", "Platform", 
+                            "Influencer Say", "Color Code", "Audience","Daypart", "Year", "Month", "Data Through", 
+                            "Cost", "Normalized Cost", "Impression", "Normalized Impression", 
+                            "Offline Dollar Sales", "Offline Volume", "Offline ROI", 
+                            "Online Dollar Sales", "Online Volume", "Online ROI", 
+                            "Overall Dollar Sales", "Overall Volume", "Overall ROI"
+                        ]
+                        df = df[column_order]
+                        last_year = df['Year'].iloc[-1]
+                        last_month = df['Month'].iloc[-1]
+                        df['Data Through'] = pd.to_datetime(f"{last_year}-{last_month}-01") + pd.offsets.MonthEnd(0)
+                        df['Data Through'] = df['Data Through'].dt.strftime('%b\'%y')
+                        st.write(f"Processed DataFrame for: {BnW_SKIN_Vaseline_PG_Data_Preparation_df.name}")
+                        st.dataframe(df)
+
+                        @st.cache_data
+                        def convert_df_to_csv(dataframe):
+                            return dataframe.to_csv(index=False).encode('utf-8')
+                        csv_data = convert_df_to_csv(df)
+                        st.download_button(
+                            label="BnW SKIN Vaseline Download Playground Processed CSV",
+                            data=csv_data,
+                            file_name="BnW_SKIN_Vaseline_Processed_Data.csv",
+                            mime='text/csv'
+                        )
+
+                    except Exception as e:
+                        st.error(f"Error processing {BnW_SKIN_Vaseline_PG_Data_Preparation_df.name}: {e}")
+
+        if selected == "BnW HAIR Nexxus":
+            st.subheader("BnW HAIR Nexxus")
+            BnW_HAIR_Nexxus_PG_Data_Preparation = st.file_uploader("Upload your BnW HAIR_Nexxus RROI file", type=["xlsx"], accept_multiple_files=True)
+            if BnW_HAIR_Nexxus_PG_Data_Preparation:
+                for BnW_HAIR_Nexxus_PG_Data_Preparation_df in BnW_HAIR_Nexxus_PG_Data_Preparation:
+                    try:
+                        df = pd.read_excel(BnW_HAIR_Nexxus_PG_Data_Preparation_df)
+
+                        #PW_DOVE_BW Playground Preparation
+                        if 'Feature ID' in df.columns:
+                            df = df.drop(columns=['Feature ID','Model Scope','Input Brand','Input Category','Modified Date','Model Scope Alias'])
+                        
+                        if "HAIR_Nexxus" in BnW_HAIR_Nexxus_PG_Data_Preparation_df.name:
+                            df["Organisation"] = "Unilever"
+                            df["Business Unit"] = "Beauty and Wellbeing"
+                            df["Category"] = "Haircare"
+                            df["Sub category"] = "Haircare"
+                            df["Brand"] = "BnW HAIR Nexxus"
+                            df["Total Brand"] = "BnW HAIR Nexxus"
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Earned Media"
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None  
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns and 'Product Line' in df.columns and 'Channel/Daypart' in df.columns and 'Audience' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Baseline"
+                                df.loc[Earned_Media_filter, 'Product Line'] = None 
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None 
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = None
+                                df.loc[Earned_Media_filter, 'Platform'] = None
+                                df.loc[Earned_Media_filter, 'Audience'] = None
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Coupon"
+                                df.loc[Earned_Media_filter, 'Platform'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None 
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Non Media"
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None    
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Owned Media"
+                                df.loc[Earned_Media_filter, 'Platform'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                df['Media Type'] = df['Media Type'].replace('Promo', 'Trade Promo')
+                                coupon_Shopper_filter = df['Media Type'] == "Trade Promo"
+                                df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = df.loc[coupon_Shopper_filter, 'Master Channel']
+                                df.loc[coupon_Shopper_filter, 'Master Channel'] = None
+
+                        df[['Data Through','Daypart']] = ''
+                            # if 'Master Channel' in df.columns and 'Daypart' in df.columns and 'Channel/Daypart' in df.columns:
+                            #     coupon_Shopper_filter = df['Master Channel'] == "TV"
+                            #     df.loc[coupon_Shopper_filter, 'Daypart'] = df.loc[coupon_Shopper_filter, 'Channel/Daypart']
+                            #     df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = None  
+
+                            # if 'Master Channel' in df.columns and 'Channel/Daypart' in df.columns:
+                            #     coupon_Shopper_filter = df['Media Type'] == "Temperature"
+                            #     df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = df.loc[coupon_Shopper_filter, 'Media Type']
+                            #     df.loc[coupon_Shopper_filter, 'Media Type'] = "Non Media"       
+
+
+                        # Convert 'Cost' and 'Impression' columns to numeric, replacing non-numeric values with NaN
+                        df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce')
+                        df['Impression'] = pd.to_numeric(df['Impression'], errors='coerce')
+                        
+                        # Handle missing values if necessary (e.g., replace NaN with 0)
+                        df['Cost'] = df['Cost'].fillna(0)
+                        df['Impression'] = df['Impression'].fillna(0)
+
+                        # Perform the division to calculate normalized values
+                        df['Normalized Cost'] = df['Cost']
+                        df['Normalized Impression'] = df['Impression']
+                        df['Platform'] = df['Platform'].replace("NonDigital", "Non-Digital")
+                        df['Platform'] = df['Platform'].replace("Prism", "Shopper")
+                        df['Channel/Daypart'] = df['Channel/Daypart'].replace("Percentage Promo", "Percentage Sales")
+                        #df.rename(columns={"Channel/Daypart": "Channel"}, inplace=True)
+                        #df[['Data Through','Daypart']] = ''
+                        column_order = [
+                            "Organisation", "Business Unit", "Category", "Sub category", "Brand", "Total Brand",
+                            "Model", "Media Type", "Product Line", "Master Channel", "Channel/Daypart", "Platform", 
+                            "Influencer Say", "Color Code", "Audience","Daypart", "Year", "Month", "Data Through", 
+                            "Cost", "Normalized Cost", "Impression", "Normalized Impression", 
+                            "Offline Dollar Sales", "Offline Volume", "Offline ROI", 
+                            "Online Dollar Sales", "Online Volume", "Online ROI", 
+                            "Overall Dollar Sales", "Overall Volume", "Overall ROI"
+                        ]
+                        df = df[column_order]
+                        last_year = df['Year'].iloc[-1]
+                        last_month = df['Month'].iloc[-1]
+                        df['Data Through'] = pd.to_datetime(f"{last_year}-{last_month}-01") + pd.offsets.MonthEnd(0)
+                        df['Data Through'] = df['Data Through'].dt.strftime('%b\'%y')
+                        st.write(f"Processed DataFrame for: {BnW_HAIR_Nexxus_PG_Data_Preparation_df.name}")
+                        st.dataframe(df)
+
+                        @st.cache_data
+                        def convert_df_to_csv(dataframe):
+                            return dataframe.to_csv(index=False).encode('utf-8')
+                        csv_data = convert_df_to_csv(df)
+                        st.download_button(
+                            label="BnW HAIR Nexxus Download Playground Processed CSV",
+                            data=csv_data,
+                            file_name="BnW_HAIR_Nexxus_Processed_Data.csv",
+                            mime='text/csv'
+                        )
+
+                    except Exception as e:
+                        st.error(f"Error processing {BnW_HAIR_Nexxus_PG_Data_Preparation_df.name}: {e}")
+
+
+        if selected == "BnW HAIR Dove":
+            st.subheader("BnW HAIR Dove")
+            BnW_HAIR_Dove_PG_Data_Preparation = st.file_uploader("Upload your BnW HAIR_Dove RROI file", type=["xlsx"], accept_multiple_files=True)
+            if BnW_HAIR_Dove_PG_Data_Preparation:
+                for BnW_HAIR_Dove_PG_Data_Preparation_df in BnW_HAIR_Dove_PG_Data_Preparation:
+                    try:
+                        df = pd.read_excel(BnW_HAIR_Dove_PG_Data_Preparation_df)
+
+                        #PW_DOVE_BW Playground Preparation
+                        if 'Feature ID' in df.columns:
+                            df = df.drop(columns=['Feature ID','Model Scope','Input Brand','Input Category','Modified Date','Model Scope Alias'])
+                        
+                        if "HAIR_Dove" in BnW_HAIR_Dove_PG_Data_Preparation_df.name:
+                            df["Organisation"] = "Unilever"
+                            df["Business Unit"] = "Beauty and Wellbeing"
+                            df["Category"] = "Haircare"
+                            df["Sub category"] = "Haircare"
+                            df["Brand"] = "BnW HAIR Dove"
+                            df["Total Brand"] = "BnW HAIR Dove"
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Earned Media"
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None  
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns and 'Product Line' in df.columns and 'Channel/Daypart' in df.columns and 'Audience' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Baseline"
+                                df.loc[Earned_Media_filter, 'Product Line'] = None 
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None 
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = None
+                                df.loc[Earned_Media_filter, 'Platform'] = None
+                                df.loc[Earned_Media_filter, 'Audience'] = None
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Coupon"
+                                df.loc[Earned_Media_filter, 'Platform'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None 
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Non Media"
+                                df.loc[Earned_Media_filter, 'Channel/Daypart'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None    
+
+                            if 'Media Type' in df.columns and 'Platform' in df.columns and 'Master Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Owned Media"
+                                df.loc[Earned_Media_filter, 'Platform'] = df.loc[Earned_Media_filter, 'Master Channel']
+                                df.loc[Earned_Media_filter, 'Master Channel'] = None
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Platform' in df.columns:
+                                df['Media Type'] = df['Media Type'].replace('Promo', 'Trade Promo')
+                                coupon_Shopper_filter = df['Media Type'] == "Trade Promo"
+                                df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = df.loc[coupon_Shopper_filter, 'Master Channel']
+                                df.loc[coupon_Shopper_filter, 'Master Channel'] = None
+
+                            df[['Data Through','Daypart']] = ''
+                            if 'Master Channel' in df.columns and 'Daypart' in df.columns and 'Channel/Daypart' in df.columns:
+                                coupon_Shopper_filter = df['Master Channel'] == "TV"
+                                df.loc[coupon_Shopper_filter, 'Daypart'] = df.loc[coupon_Shopper_filter, 'Channel/Daypart']
+                                df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = None  
+
+                            if 'Master Channel' in df.columns and 'Channel/Daypart' in df.columns:
+                                coupon_Shopper_filter = df['Media Type'] == "MasterBrand"
+                                coupon_Shopper_filter = df['Master Channel'] == "PR"
+                                df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = df.loc[coupon_Shopper_filter, 'Master Channel']
+                                df.loc[coupon_Shopper_filter, 'Master Channel'] = " "       
+
+                            if 'Master Channel' in df.columns and 'Channel/Daypart' in df.columns:
+                                coupon_Shopper_filter = df['Media Type'] == "MasterBrand"
+                                coupon_Shopper_filter = df['Master Channel'] == "Influencer"
+                                df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = df.loc[coupon_Shopper_filter, 'Master Channel']
+                                df.loc[coupon_Shopper_filter, 'Master Channel'] = " "  
+
+                            if 'Master Channel' in df.columns and 'Channel/Daypart' in df.columns:
+                                coupon_Shopper_filter = (df['Media Type'] == "Halo") & (
+                                    df['Master Channel'].isin(["Commerce Display", "Commerce Search", "Digital Search", "Digital Search Visual"]))
+                                df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = df.loc[coupon_Shopper_filter, 'Master Channel']
+                                df.loc[coupon_Shopper_filter, 'Master Channel'] = "Commerce & Search"
+
+                            if 'Master Channel' in df.columns and 'Channel/Daypart' in df.columns:
+                                coupon_Shopper_filter = (df['Media Type'] == "Halo") & (
+                                    df['Master Channel'].isin(["Digital Audio", "Digital Display", "Digital FEP", "Digital HUM","Digital Social","Digital Video"]))
+                                df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = df.loc[coupon_Shopper_filter, 'Master Channel']
+                                df.loc[coupon_Shopper_filter, 'Master Channel'] = "Digital"
+
+
+
+                        # Convert 'Cost' and 'Impression' columns to numeric, replacing non-numeric values with NaN
+                        df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce')
+                        df['Impression'] = pd.to_numeric(df['Impression'], errors='coerce')
+                        
+                        # Handle missing values if necessary (e.g., replace NaN with 0)
+                        df['Cost'] = df['Cost'].fillna(0)
+                        df['Impression'] = df['Impression'].fillna(0)
+
+                        # Perform the division to calculate normalized values
+                        df['Normalized Cost'] = df['Cost']
+                        df['Normalized Impression'] = df['Impression']
+                        df['Platform'] = df['Platform'].replace("NonDigital", "Non-Digital")
+                        df['Platform'] = df['Platform'].replace("Prism", "Shopper")
+                        df['Channel/Daypart'] = df['Channel/Daypart'].replace("Percentage Promo", "Percentage Sales")
+                        #df.rename(columns={"Channel/Daypart": "Channel"}, inplace=True)
+                        #df[['Data Through','Daypart']] = ''
+                        column_order = [
+                            "Organisation", "Business Unit", "Category", "Sub category", "Brand", "Total Brand",
+                            "Model", "Media Type", "Product Line", "Master Channel", "Channel/Daypart", "Platform", 
+                            "Influencer Say", "Color Code", "Audience","Daypart", "Year", "Month", "Data Through", 
+                            "Cost", "Normalized Cost", "Impression", "Normalized Impression", 
+                            "Offline Dollar Sales", "Offline Volume", "Offline ROI", 
+                            "Online Dollar Sales", "Online Volume", "Online ROI", 
+                            "Overall Dollar Sales", "Overall Volume", "Overall ROI"
+                        ]
+                        df = df[column_order]
+                        last_year = df['Year'].iloc[-1]
+                        last_month = df['Month'].iloc[-1]
+                        df['Data Through'] = pd.to_datetime(f"{last_year}-{last_month}-01") + pd.offsets.MonthEnd(0)
+                        df['Data Through'] = df['Data Through'].dt.strftime('%b\'%y')
+                        st.write(f"Processed DataFrame for: {BnW_HAIR_Dove_PG_Data_Preparation_df.name}")
+                        st.dataframe(df)
+
+                        @st.cache_data
+                        def convert_df_to_csv(dataframe):
+                            return dataframe.to_csv(index=False).encode('utf-8')
+                        csv_data = convert_df_to_csv(df)
+                        st.download_button(
+                            label="BnW HAIR Dove Download Playground Processed CSV",
+                            data=csv_data,
+                            file_name="BnW_HAIR_Dove_Processed_Data.csv",
+                            mime='text/csv'
+                        )
+
+                    except Exception as e:
+                        st.error(f"Error processing {BnW_HAIR_Dove_PG_Data_Preparation_df.name}: {e}")
+    
+        if selected == "NIC Mayo Hellmann's":
+            st.subheader("NIC Mayo Hellmann's")
+            NIC_Mayo_Hellmann_PG_Data_Preparation = st.file_uploader("Upload your NIC Mayo Hellmann's RROI file", type=["xlsx"], accept_multiple_files=True)
+            if NIC_Mayo_Hellmann_PG_Data_Preparation:
+                for NIC_Mayo_Hellmann_Data_Preparation_df in NIC_Mayo_Hellmann_PG_Data_Preparation:
+                    try:
+                        df = pd.read_excel(NIC_Mayo_Hellmann_Data_Preparation_df)
+
+                        #PW_DOVE_BW Playground Preparation
+                        if 'Feature ID' in df.columns:
+                            df = df.drop(columns=['Feature ID','Model Scope','Input Brand','Input Category','Upload Date','Modified Date','Model Scope Alias'])
+                        
+                        if "MAYO_Hellmann's" in NIC_Mayo_Hellmann_Data_Preparation_df.name:
+                            df["Organisation"] = "Unilever"
+                            df["Business Unit"] = "NIC"
+                            df["Category"] = "Nutritions"
+                            df["Sub category"] = "Nutritions"
+                            df["Brand"] = "NIC Mayo Hellmann's"
+                            df["Total Brand"] = "NIC Mayo Hellmann's"
+
+                            if 'Media Type' in df.columns and 'Product Line' in df.columns and 'Channel' in df.columns:
+                                Earned_Media_filter = df['Media Type'] == "Earned Media"
+                                df.loc[Earned_Media_filter, 'Channel'] = df.loc[Earned_Media_filter, 'Product Line']
+                                df.loc[Earned_Media_filter, 'Product Line'] = None  
+    
+                            
+                        df[['Data Through','Daypart']] = ''
+                            # if 'Master Channel' in df.columns and 'Daypart' in df.columns and 'Channel/Daypart' in df.columns:
+                            #     coupon_Shopper_filter = df['Master Channel'] == "TV"
+                            #     df.loc[coupon_Shopper_filter, 'Daypart'] = df.loc[coupon_Shopper_filter, 'Channel/Daypart']
+                            #     df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = None  
+
+                            # if 'Master Channel' in df.columns and 'Channel/Daypart' in df.columns:
+                            #     coupon_Shopper_filter = df['Media Type'] == "Temperature"
+                            #     df.loc[coupon_Shopper_filter, 'Channel/Daypart'] = df.loc[coupon_Shopper_filter, 'Media Type']
+                            #     df.loc[coupon_Shopper_filter, 'Media Type'] = "Non Media"       
+
+
+                        # Convert 'Cost' and 'Impression' columns to numeric, replacing non-numeric values with NaN
+                        df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce')
+                        df['Impression'] = pd.to_numeric(df['Impression'], errors='coerce')
+                        
+                        # Handle missing values if necessary (e.g., replace NaN with 0)
+                        df['Cost'] = df['Cost'].fillna(0)
+                        df['Impression'] = df['Impression'].fillna(0)
+
+                        # Perform the division to calculate normalized values
+                        df['Normalized Cost'] = df['Cost']
+                        df['Normalized Impression'] = df['Impression']
+                        df['Platform'] = df['Platform'].replace("NonDigital", "Non-Digital")
+                        df['Platform'] = df['Platform'].replace("Prism", "Shopper")
+                        df['Channel/Daypart'] = df['Channel/Daypart'].replace("Percentage Promo", "Percentage Sales")
+                        #df.rename(columns={"Channel/Daypart": "Channel"}, inplace=True)
+                        #df[['Data Through','Daypart']] = ''
+                        column_order = [
+                            "Organisation", "Business Unit", "Category", "Sub category", "Brand", "Total Brand",
+                            "Model", "Media Type", "Product Line", "Master Channel", "Channel/Daypart", "Platform", 
+                            "Influencer Say", "Color Code", "Audience","Daypart", "Year", "Month", "Data Through", 
+                            "Cost", "Normalized Cost", "Impression", "Normalized Impression", 
+                            "Offline Dollar Sales", "Offline Volume", "Offline ROI", 
+                            "Online Dollar Sales", "Online Volume", "Online ROI", 
+                            "Overall Dollar Sales", "Overall Volume", "Overall ROI"
+                        ]
+                        df = df[column_order]
+                        last_year = df['Year'].iloc[-1]
+                        last_month = df['Month'].iloc[-1]
+                        df['Data Through'] = pd.to_datetime(f"{last_year}-{last_month}-01") + pd.offsets.MonthEnd(0)
+                        df['Data Through'] = df['Data Through'].dt.strftime('%b\'%y')
+                        st.write(f"Processed DataFrame for: {NIC_Mayo_Hellmann_Data_Preparation_df.name}")
+                        st.dataframe(df)
+
+                        @st.cache_data
+                        def convert_df_to_csv(dataframe):
+                            return dataframe.to_csv(index=False).encode('utf-8')
+                        csv_data = convert_df_to_csv(df)
+                        st.download_button(
+                            label="NIC Mayo Hellmann's Download Playground Processed CSV",
+                            data=csv_data,
+                            file_name="NIC_Mayo_Hellmann's_Processed_Data.csv",
+                            mime='text/csv'
+                        )
+
+                    except Exception as e:
+                        st.error(f"Error processing {NIC_Mayo_Hellmann_Data_Preparation_df.name}: {e}")
+    # if selected == "Appended the Processed File":
+
+    #     st.subheader("PC PW DOVE BW")
+    #     Appended_the_Processed_Data = st.file_uploader("Upload your PW DOVE BW RROI file", type=["xlsx"], accept_multiple_files=True)
+
+
+
+
+
+
+
+    if selected == "Data Validation(Metrics)":
+        st.subheader("Data Validation(Metrics)")
+
+        # Upload and process Metrics RROI files
+        Metrics_RROI = st.file_uploader("Upload your Processed RROI file", type=["csv"], accept_multiple_files=True)
         Metrics_df = []
         if Metrics_RROI:
             for file in Metrics_RROI:
-                    Metrics_RROI_df = pd.read_csv(file)
-                    Metrics_df.append(Metrics_RROI_df)
-            st.write("Full Data:")
+                Metrics_RROI_df = pd.read_csv(file)
+                Metrics_df.append(Metrics_RROI_df)
+            st.write("Processed RROI Data")
             st.write(Metrics_RROI_df)
+        
+        # Upload and process AI RROI files
         AI_RROI_File = st.file_uploader("Upload your AI RROI file", type=["xlsx"], accept_multiple_files=True)
         AI_RROI_check = []
         if AI_RROI_File:
             for file in AI_RROI_File:
                 AI_RROI_File_df = pd.read_excel(file)
                 AI_RROI_check.append(AI_RROI_File_df)
-            st.write(AI_RROI_File_df) 
-            enable_filters = st.checkbox("Enable Sidebar Filters and Pivot Table")
-            if enable_filters:
-                Metrics_RROI_df = sidebar_filters_1(Metrics_RROI_df)   
-                pivot_table = generate_pivot_table_1(Metrics_RROI_df)
-                st.write("Combine RROI Pivot Table:")
-                st.write(pivot_table)
-                AI_RROI_File_df = sidebar_filters_2(AI_RROI_File_df)   
-                pivot_table = generate_pivot_table_2(AI_RROI_File_df)
-                st.write("AI RROI Pivot Table:")
-                st.write(pivot_table)    
-        # Add content for Playground here
+            st.write("AI RROI Data")
+            st.write(AI_RROI_File_df)
+        
+        # Columns to validate
+        columns_to_validate = [
+            'Cost', 'Impression', 'Offline Dollar Sales', 'Offline Volume', 
+            'Offline ROI', 'Online Dollar Sales', 'Online Volume', 
+            'Online ROI', 'Overall Dollar Sales', 'Overall Volume', 'Overall ROI'
+        ]
+        
+        # Perform sum comparison if both files are uploaded
+        if Metrics_RROI and AI_RROI_File:
+            for column in columns_to_validate:
+                try:
+                    # Calculate sums for the column
+                    Metrics_column_sum = round(sum(df[column].sum() for df in Metrics_df),2)
+                    AI_column_sum = round(sum(df[column].sum() for df in AI_RROI_check),2)
+
+                    # Display results for each column
+                    st.write(f"Sum of '{column}' in Processed RROI: {Metrics_column_sum}")
+                    st.write(f"Sum of '{column}' in AI RROI: {AI_column_sum}")
+
+                    # Check if the sums match
+                    if Metrics_column_sum == AI_column_sum:
+                        st.success(f"The sums of '{column}' match!")
+                    else:
+                        st.error(f"The sums of '{column}' do not match!")
+                except KeyError:
+                    st.warning(f"Column '{column}' not found in one of the uploaded files.")
+
+    
+    if selected == "Data Validation(dimensions)":
+        st.subheader("Data Validation(dimensions)")
+
+        # Upload and process Mapper RROI files
+        Metrics_RROI = st.file_uploader("Upload your mapper RROI file", type=["xlsx"], accept_multiple_files=True)
+        Metrics_df = []
+        if Metrics_RROI:
+            for file in Metrics_RROI:
+                Metrics_RROI_df = pd.read_excel(file)
+                Metrics_df.append(Metrics_RROI_df)
+            st.write("Mapper RROI Data")
+            st.write(Metrics_RROI_df)
+        
+        # Upload and process Processed RROI files
+        AI_RROI_File = st.file_uploader("Upload your Processed RROI file", type=["csv"], accept_multiple_files=True)
+        AI_RROI_check = []
+        if AI_RROI_File:
+            for file in AI_RROI_File:
+                AI_RROI_File_df = pd.read_csv(file)
+                AI_RROI_check.append(AI_RROI_File_df)
+            st.write("Processed RROI Data")
+            st.write(AI_RROI_File_df)
+        
+        # Columns to validate
+        dimensions_to_validate = [
+            'Organisation', 'Business Unit', 'Category', 'Sub category', 
+            'Brand', 'Total Brand', 'Media Type', 'Product Line', 
+            'Master Channel', 'Channel', 'Platform', 'Influencer Say', 
+            'Color Code', 'Audience', 'Daypart'
+        ]
+        
+        # Perform validation if both files are uploaded
+        if Metrics_RROI and AI_RROI_File:
+            for dimension in dimensions_to_validate:
+                try:
+                    # Get unique values from both files
+                    mapper_values = set(Metrics_RROI_df[dimension].dropna().unique())
+                    processed_values = set(AI_RROI_File_df[dimension].dropna().unique())
+                    
+                    # Check if values match
+                    missing_in_processed = mapper_values - processed_values
+                    missing_in_mapper = processed_values - mapper_values
+                    
+                    # Display results
+                    st.write(f"**Dimension: {dimension}**")
+                    if not missing_in_processed and not missing_in_mapper:
+                        st.success(f"All values in '{dimension}' match between the two files.")
+                    else:
+                        if missing_in_processed:
+                            st.warning(f"Values in Mapper but missing in Processed for '{dimension}': {missing_in_processed}")
+                        if missing_in_mapper:
+                            st.warning(f"Values in Processed but missing in Mapper for '{dimension}': {missing_in_mapper}")
+                except KeyError:
+                    st.warning(f"Column '{dimension}' not found in one of the uploaded files.")
+
+                  
 
 
        
